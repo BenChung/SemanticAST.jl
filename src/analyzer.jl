@@ -554,7 +554,7 @@ expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin
     SN(SH(K"abstract", _), [sig]) => expand_abstract_def(ast, sig, ctx)
     SN(SH(K"struct", _), [mut, sig, fields]) => expand_struct_def(ast, node_to_bool(mut), sig, fields, ctx)
     SN(SH(K"primitive", _), [sig, size]) => expand_primitive_def(ast, sig, size, ctx)
-    SN(SH(K"toplevel", _), exprs) => ToplevelStmt(expand_forms.(exprs, (ctx, )), ast)
+    SN(SH(K"toplevel", _), exprs) => ToplevelStmt(expand_toplevel.(exprs, (ctx, )), ast)
 	SN(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), docs, inner_ast]) => DocstringStmt(Expr(docs), expand_toplevel(inner_ast, ctx), ast)
 	expr => ExprStmt(expand_forms(expr, JuliaSyntax.head(expr), JuliaSyntax.children(expr), ExpandCtx(ctx; is_toplevel = true)), ast)
 end
