@@ -217,7 +217,7 @@ expr_tests() = [
 		"(x..., y..., z) = (1,2)" => ErrorResult(),
 		"[a; b] = 2" => ErrorResult(),
 		"[a b] = 2" => ErrorResult(),
-		"[a ;; b] = 2" => ErrorResult()
+        "f() = 3" => "Assignment(FunctionAssignment(ResolvedName([:f]), [], [], [], nothing), Literal(3))",
 	],
 	:comparison => [
 		"a < b < c" => "Comparison(Variable(:a), [Variable(:<) => Variable(:b), Variable(:<) => Variable(:c)])",
