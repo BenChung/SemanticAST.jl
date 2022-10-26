@@ -27,7 +27,10 @@ Macros are challenging for the SemanticAST approach because they can accept non-
 produce unusual `Expr` forms as well as use a wide range of forms not otherwise produced by parsing. As SemanticAST sits
 on top of JuliaSyntax and only understands JuliaSyntax `SyntaxNode`s it cannot practically run macros directly as while a 
 `SyntaxNode` can be converted to an `Expr` vice versa is not possible without loss of information. Thus, at present,
-macro invocations are simply replaced with a placeholder.
+macro invocations are simply replaced with a placeholder. There's limited hardcoded support for a small list of built-in macros
+but no more.
+
+Similarly, support for quoting is as of now more or less nonexistent. 
 
 # Use
 

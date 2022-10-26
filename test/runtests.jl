@@ -363,7 +363,15 @@ expr_tests() = [
 		"let x() = 3; x() end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[FunctionAssignment(ResolvedName([:x]), [], [], [], nothing) => Literal(3)], Block([FunCall(Variable(:x), [], [])]))",
 		"let x; 2 end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[:x], Block([Literal(2)]))",
 		"let (x, y) = 2; 2 end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]) => Literal(2)], Block([Literal(2)]))"
-	]
+	],
+    :docstring => [
+        """
+        \"\"\"
+        Foo Bar Baz
+        \"\"\"
+        function x() end
+        """ => "Docstring(\"Foo Bar Baz\\n\", FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([])))"
+    ]
 ]
 
 toplevel_tests() = [ 
@@ -430,8 +438,91 @@ toplevel_tests() = [
 	:module => [
 		"module Foo end" => "ModuleStmt(true, :Foo, [])",
 		"module Foo module Bar end end" => "ModuleStmt(true, :Foo, [ModuleStmt(true, :Bar, [])])",
-		"function f() module Foo module Bar end end end" => ErrorResult()
-	]
+		"function f() module Foo module Bar end end end" => ErrorResult(),
+        "baremodule Foo end" => "ModuleStmt(false, :Foo, [])"
+	],
+    :docstring => [
+        """
+        \"\"\"
+        Foo Bar Baz
+        \"\"\"
+        function x() end
+        """ => "DocstringStmt(\"Foo Bar Baz\\n\", ExprStmt(FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([]))))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        const a = 1
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_CONST)])))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        global a = 1
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_GLOBAL)])))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        baremodule M end
+        """ => "DocstringStmt(\"...\\n\", ModuleStmt(false, :M, []))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        module M end
+        """ => "DocstringStmt(\"...\\n\", ModuleStmt(true, :M, []))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        abstract type T1 end
+        """ => "DocstringStmt(\"...\\n\", AbstractDefStmt(:T1, Symbol[], nothing))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        mutable struct T2 end
+        """ => "DocstringStmt(\"...\\n\", StructDefStmt(:T2, Symbol[], nothing, [], []))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        struct T3 end
+        """ => "DocstringStmt(\"...\\n\", StructDefStmt(:T3, Symbol[], nothing, [], []))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        macro m(x) end
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing)], [], nothing, Block([]))))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        f(x) = x
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing)], [], [], nothing), Variable(:x))))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        function f(x)
+            x
+        end        
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing)], [], [], nothing, Block([Variable(:x)]))))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        f(x)    
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunCall(Variable(:f), [PositionalArg(Variable(:x))], [])))",
+        """
+        \"\"\"
+        ...
+        \"\"\"
+        function f end   
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing)))"
+    ]
 ]
 
 @testset "Statement tests" begin

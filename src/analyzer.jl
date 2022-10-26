@@ -554,6 +554,7 @@ expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin
     SN(SH(K"struct", _), [mut, sig, fields]) => expand_struct_def(ast, node_to_bool(mut), sig, fields, ctx)
     SN(SH(K"primitive", _), [sig, size]) => expand_primitive_def(ast, sig, size, ctx)
     SN(SH(K"toplevel", _), exprs) => ToplevelStmt(expand_forms.(exprs, (ctx, )), ast)
+	SN(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), docs, inner_ast]) => DocstringStmt(Expr(docs), expand_toplevel(inner_ast, ctx), ast)
 	expr => ExprStmt(expand_forms(expr, JuliaSyntax.head(expr), JuliaSyntax.children(expr), ExpandCtx(ctx; is_toplevel = true)), ast)
 end
 
@@ -638,6 +639,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"comprehension", _), [generator]) => Comprehension(expand_generator(generator, ctx), ast)
     (SH(K"typed_comprehension", _), [type, generator]) => Comprehension(expand_forms(type, ctx), expand_generator(generator, ctx), ast)
 	(SH(K"Identifier", _), _) => Variable(Expr(ast), ast)
+	(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), docs, inner_ast]) => Docstring(Expr(docs), expand_forms(inner_ast, ctx), ast)
 	(SH(K"macrocall", _), [mcro, ast]) => handle_macrocall(mcro, ast)
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => throw(ASTException(ast, "must be at top level"))
 	(SH(op && GuardBy(JuliaSyntax.is_operator), _ && GuardBy(JuliaSyntax.is_dotted)), _) => Broadcast(Variable(Symbol(string(op)), ast), ast)
