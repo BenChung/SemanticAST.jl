@@ -524,6 +524,11 @@ function expand_import_path(src_path)
 	return path
 end
 
+expand_tuple_arg(expr, ctx) = @match expr begin 
+    SN(SH(K"...", _), [ex]) => Splat(expand_forms(ex, ctx), expr)
+    _ => expand_forms(expr, ctx)
+end
+
 struct ExpandCtx 
 	is_toplevel::Bool
 	is_loop::Bool
@@ -607,7 +612,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
 		end
 	(SH(K"tuple", _), [arg1, args..., SN(SH(K"parameters", _), _)]) => throw(ASTException(ast, "unexpected semicolon in tuple"))
 	(SH(K"tuple", _), [SN(SH(K"parameters", _), params)]) => NamedTupleExpr(expand_named_tuple(params, ctx), ast)
-	(SH(K"tuple", _), args) => any(isassignment, args) ? NamedTupleExpr(expand_named_tuple(args, ctx), ast) : TupleExpr(expand_forms.(args, (ctx, )), ast)
+	(SH(K"tuple", _), args) => any(isassignment, args) ? NamedTupleExpr(expand_named_tuple(args, ctx), ast) : TupleExpr(expand_tuple_arg.(args, (ctx, )), ast)
     (SH(K"braces", _), _) => throw(ASTException(ast, "{ } vector syntax is discontinued"))
     (SH(K"bracescat", _), _) => throw(ASTException(ast, "{ } matrix syntax is discontinued"))
     (SH(K"string", _), args) => StringInterpolate(string_interpoland.(args, (ctx, )), ast)

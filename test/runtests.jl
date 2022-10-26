@@ -246,6 +246,8 @@ expr_tests() = [
 		"(2=3, a=9)" => ErrorResult(),
 		"((x+y) => 3, b=3)" => "NamedTupleExpr([ComputedNamedValue(FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), Literal(3)), NamedValue(:b, Literal(3))])",
 		"(;x, y)" => "NamedTupleExpr([NamedValue(:x, Variable(:x)), NamedValue(:y, Variable(:y))])",
+		"(;x.x, x.y)" => "NamedTupleExpr([NamedValue(:x, GetProperty(Variable(:x), :x)), NamedValue(:y, GetProperty(Variable(:x), :y))])",
+        "(x..., )" => "TupleExpr([Splat(Variable(:x))])",
         "(x=y, z...)" => "NamedTupleExpr([NamedValue(:x, Variable(:y)), SplattedNamedValue(Variable(:z))])"
 	],
 	:string => [

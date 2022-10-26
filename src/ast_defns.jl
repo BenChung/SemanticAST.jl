@@ -131,7 +131,7 @@ end
 	WhereType(type::Expression, vars::Vector{TyVar})
 	Declaration(vars::Vector{VarDecl})
 	DoStatement(func::Expression, arguments::Vector{FnArg}, body::Expression)
-	TupleExpr(exprs::Vector{Expression})
+	TupleExpr(exprs::Vector{Union{Expression, Splat}})
 	NamedTupleExpr(exprs::Vector{NamedTupleBody})
 	StringInterpolate(components::Vector{Union{String, Expression}})
 	TypeAssert(val::Expression, typ::Expression)
