@@ -446,6 +446,7 @@ expand_named_tuple_arg(expr, ctx) = @match expr begin
 	SN(SH(K"Identifier", _), _) && name => NamedValue(Expr(name), expand_forms(name, ctx), expr)
 	SN(SH(K".", _), [rec, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) && ast => NamedValue(Expr(field), expand_forms(ast, ctx), expr)
 	SN(SH(K"call", GuardBy(JuliaSyntax.is_infix)), [lhs, SN(SH(K"=>", _), _), rhs]) => ComputedNamedValue(expand_forms(lhs, ctx), expand_forms(rhs, ctx), expr)
+    SN(SH(K"...", _), [splat]) => SplattedNamedValue(expand_forms(splat, ctx), expr)
 	expr => throw("invalid $expr")
 end
 expand_named_tuple(args, ctx) = expand_named_tuple_arg.(args, (ctx, ))

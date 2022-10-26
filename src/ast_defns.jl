@@ -60,6 +60,7 @@ end
 @ast_data NamedTupleBody <: ASTNode begin
 	NamedValue(name::Symbol, value::Expression)
 	ComputedNamedValue(name::Expression, value::Expression)
+    SplattedNamedValue(splat::Expression)
 end
 
 @ast_node struct IfClause <: ASTNode
