@@ -149,6 +149,7 @@ end
 	Comprehension(type::Union{Expression, Nothing}, gen::Generator)
 	Quote(ast::JuliaSyntax.SyntaxNode)
     Docstring(doc::String, defn::Expression)
+    Ternary(cond::Expression, then::Expression, els::Expression)
 end
 
 @ast_data LValueImpl <: LValue begin 

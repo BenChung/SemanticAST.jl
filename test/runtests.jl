@@ -371,6 +371,9 @@ expr_tests() = [
         \"\"\"
         function x() end
         """ => "Docstring(\"Foo Bar Baz\\n\", FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([])))"
+    ],
+    :? => [
+        "x ? y : z" => "Ternary(Variable(:x), Variable(:y), Variable(:z))"
     ]
 ]
 
