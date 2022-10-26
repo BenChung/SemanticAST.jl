@@ -139,6 +139,7 @@ end
 	WhileStmt(cond::Expression, body::Expression)
 	BreakStmt()
 	ContinueStmt()
+    ReturnStmt(retval::Union{Expression, Nothing})
 	ForStmt(iters::Vector{Pair{LValue, Expression}}, body::Expression)
 	Vect(elems::Vector{Union{Expression, Splat}})
 	HCat(type::Union{Expression, Nothing}, elems::Vector{Union{Expression, Splat}})

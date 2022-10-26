@@ -617,6 +617,8 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"while", _), [cond, body]) => let ictx = ExpandCtx(ctx; is_loop=true); WhileStmt(expand_forms(cond, ictx), expand_forms(body, ictx), ast) end
     (SH(K"break", _), _) => if ctx.is_loop BreakStmt(ast) else throw(ASTException(ast, "break or continue outside loop")) end
     (SH(K"continue", _), _) => if ctx.is_loop ContinueStmt(ast) else throw(ASTException(ast, "break or continue outside loop")) end
+    (SH(K"return", _), [val]) => ReturnStmt(expand_forms(val, ctx), ast)
+    (SH(K"return", _), []) => ReturnStmt(nothing)
     (SH(K"for", _), [SN(SH(K"=", _), _) && iterspec, body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx)], expand_forms(body, ctx), ast) end
     (SH(K"for", _), [SN(SH(K"block", _), iterspecs), body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx) for iterspec in iterspecs], expand_forms(body, ictx), ast) end
     (SH(K"&&", _), [l, r]) => FunCall(Variable(:(&&)), split_arguments([l, r], ctx)..., ast)
