@@ -546,7 +546,7 @@ end
 next_ctx(head, ctx) = ExpandCtx(ctx)
 
 function handle_macrocall(mcro, ast)
-	return Literal(:placeholder)
+	return Literal(:placeholder, mcro)
 end
 
 expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin 
@@ -648,6 +648,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"typed_comprehension", _), [type, generator]) => Comprehension(expand_forms(type, ctx), expand_generator(generator, ctx), ast)
 	(SH(K"Identifier", _), _) => Variable(Expr(ast), ast)
 	(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), docs, inner_ast]) => Docstring(Expr(docs), expand_forms(inner_ast, ctx), ast)
+	(SH(K"macrocall", _), [mcro, ast...]) => handle_macrocall(mcro, ast)
     (SH(K"?", _), [cond, then, els]) => Ternary(expand_forms(cond, ctx), expand_forms(then, ctx), expand_forms(els, ctx), ast)
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => throw(ASTException(ast, "must be at top level"))
 	(SH(op && GuardBy(JuliaSyntax.is_operator), _ && GuardBy(JuliaSyntax.is_dotted)), _) => Broadcast(Variable(Symbol(string(op)), ast), ast)
