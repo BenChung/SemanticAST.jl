@@ -15,8 +15,9 @@ end
 
 abstract type LValue <: ASTNode end
 @ast_node struct FnArg <: ASTNode
-	binding::LValue
+	binding::Union{LValue, Nothing}
 	default_value::Union{ASTNode, Nothing}
+    type::Union{Expression, Nothing}
 end
 
 struct KwArg <: ASTNode
