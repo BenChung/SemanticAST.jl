@@ -385,6 +385,16 @@ expr_tests() = [
     ],
     :? => [
         "x ? y : z" => "Ternary(Variable(:x), Variable(:y), Variable(:z))"
+    ],
+    :return => [
+        "return" => "ReturnStmt(nothing)",
+        "return 2" => "ReturnStmt(Literal(2))"
+    ],
+    :literals => [
+        "true" => "Literal(true)",
+        "false" => "Literal(false)",
+        "'c'" => "Literal('c')",
+        "3" => "Literal(3)",
     ]
 ]
 
