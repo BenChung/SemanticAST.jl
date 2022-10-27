@@ -218,7 +218,11 @@ expr_tests() = [
 		"(x..., y..., z) = (1,2)" => ErrorResult(),
 		"[a; b] = 2" => ErrorResult(),
 		"[a b] = 2" => ErrorResult(),
+		"[a ;; b] = 2" => ErrorResult(),
         "f() = 3" => "Assignment(FunctionAssignment(ResolvedName([:f]), [], [], [], nothing), Literal(3))",
+        "f(x) = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))",
+        "f(x::T) where T = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, nothing, nothing)], nothing), Variable(:x))", 
+        "f(x::T) where T <: V = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, Variable(:V), nothing)], nothing), Variable(:x))"
 	],
 	:comparison => [
 		"a < b < c" => "Comparison(Variable(:a), [Variable(:<) => Variable(:b), Variable(:<) => Variable(:c)])",
@@ -505,13 +509,13 @@ toplevel_tests() = [
         ...
         \"\"\"
         macro m(x) end
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing)], [], nothing, Block([]))))",
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], nothing, Block([]))))",
         """
         \"\"\"
         ...
         \"\"\"
         f(x) = x
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing)], [], [], nothing), Variable(:x))))",
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))))",
         """
         \"\"\"
         ...
@@ -519,7 +523,7 @@ toplevel_tests() = [
         function f(x)
             x
         end        
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing)], [], [], nothing, Block([Variable(:x)]))))",
+        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing, Block([Variable(:x)]))))",
         """
         \"\"\"
         ...
