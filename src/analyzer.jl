@@ -514,12 +514,12 @@ function expand_import_path(src_path)
 	path = nothing
 	for path_el in src_path 
 		path = @match (path_el, path) begin
-			(SN(SH(K"Identifier", _), _) && id, nothing) => ImportId(Expr(id), path_el)
-			(SN(SH(K"Identifier", _), _) && id, path) => ImportField(path, Expr(id), path_el)
+			(SN(SH(K"Identifier" || K"MacroName", _), _) && id, nothing) => ImportId(Expr(id), path_el)
+			(SN(SH(K"Identifier" || K"MacroName", _), _) && id, path) => ImportField(path, Expr(id), path_el)
 			(SN(SH(K".", _), _), nothing) => ImportRelative(1, path_el)
 			(SN(SH(K".", _), _), ImportRelative(lvl, _)) => ImportRelative(lvl+1, path_el)
 			(SN(SH(K".", _), _), _) => throw(ASTException(src_path, "invalid path: \".\" in identifier path"))
-			(_, _) => throw(ASTException(src_path,"invalid path"))
+			(_, _) => throw(ASTException(path_el, "invalid path"))
 		end
 	end
 	return path

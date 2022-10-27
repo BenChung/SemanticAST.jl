@@ -432,7 +432,10 @@ toplevel_tests() = [
 		"import Foo: baz as Bar, b.bar" => "SourceImportStmt(ImportId(:Foo), [AliasDep(ImportId(:baz), :Bar), Dep(ImportField(ImportId(:b), :bar))])",
 		"import Foo as Bar" => "ImportStmt([AliasDep(ImportId(:Foo), :Bar)])",
 		"import Foo as Bar, Bar as Baz" => "ImportStmt([AliasDep(ImportId(:Foo), :Bar), AliasDep(ImportId(:Bar), :Baz)])",
-		"import Foo.Bar + 2" => ErrorResult()
+		"import Foo.Bar + 2" => ErrorResult(),
+        "import Foo.@baz" => "ImportStmt([Dep(ImportField(ImportId(:Foo), Symbol(\"@baz\")))])",
+        "import Foo: @baz" => "SourceImportStmt(ImportId(:Foo), [Dep(ImportId(Symbol(\"@baz\")))])",
+        "import Foo.Bar: @baz" => "SourceImportStmt(ImportField(ImportId(:Foo), :Bar), [Dep(ImportId(Symbol(\"@baz\")))])"
 	],
 	:using => [
 		"using Foo" => "UsingStmt([ImportId(:Foo)])",
