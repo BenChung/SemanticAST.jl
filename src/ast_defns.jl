@@ -18,7 +18,6 @@ abstract type LValue <: ASTNode end
 	binding::LValue
 	default_value::Union{ASTNode, Nothing}
 end
-@as_record FnArg
 
 struct KwArg <: ASTNode
 	name::Symbol
