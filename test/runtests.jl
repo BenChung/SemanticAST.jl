@@ -377,7 +377,7 @@ expr_tests() = [
         Foo Bar Baz
         \"\"\"
         function x() end
-        """ => "Docstring(\"Foo Bar Baz\\n\", FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([])))"
+        """ => "Docstring(StringInterpolate([\"Foo Bar Baz\\n\"]), FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([])))"
     ],
     :boolops => [
         "a && b" => "FunCall(Variable(:&&), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])",
@@ -461,61 +461,61 @@ toplevel_tests() = [
         Foo Bar Baz
         \"\"\"
         function x() end
-        """ => "DocstringStmt(\"Foo Bar Baz\\n\", ExprStmt(FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([]))))",
+        """ => "DocstringStmt(StringInterpolate([\"Foo Bar Baz\\n\"]), ExprStmt(FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([]))))",
         """
         \"\"\"
         ...
         \"\"\"
         const a = 1
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_CONST)])))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_CONST)])))",
         """
         \"\"\"
         ...
         \"\"\"
         global a = 1
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_GLOBAL)])))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_GLOBAL)])))",
         """
         \"\"\"
         ...
         \"\"\"
         baremodule M end
-        """ => "DocstringStmt(\"...\\n\", ModuleStmt(false, :M, []))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ModuleStmt(false, :M, []))",
         """
         \"\"\"
         ...
         \"\"\"
         module M end
-        """ => "DocstringStmt(\"...\\n\", ModuleStmt(true, :M, []))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ModuleStmt(true, :M, []))",
         """
         \"\"\"
         ...
         \"\"\"
         abstract type T1 end
-        """ => "DocstringStmt(\"...\\n\", AbstractDefStmt(:T1, Symbol[], nothing))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), AbstractDefStmt(:T1, Symbol[], nothing))",
         """
         \"\"\"
         ...
         \"\"\"
         mutable struct T2 end
-        """ => "DocstringStmt(\"...\\n\", StructDefStmt(:T2, Symbol[], nothing, [], []))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), StructDefStmt(:T2, Symbol[], nothing, [], []))",
         """
         \"\"\"
         ...
         \"\"\"
         struct T3 end
-        """ => "DocstringStmt(\"...\\n\", StructDefStmt(:T3, Symbol[], nothing, [], []))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), StructDefStmt(:T3, Symbol[], nothing, [], []))",
         """
         \"\"\"
         ...
         \"\"\"
         macro m(x) end
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], nothing, Block([]))))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], nothing, Block([]))))",
         """
         \"\"\"
         ...
         \"\"\"
         f(x) = x
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))))",
         """
         \"\"\"
         ...
@@ -523,19 +523,25 @@ toplevel_tests() = [
         function f(x)
             x
         end        
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing, Block([Variable(:x)]))))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing, Block([Variable(:x)]))))",
         """
         \"\"\"
         ...
         \"\"\"
         f(x)    
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunCall(Variable(:f), [PositionalArg(Variable(:x))], [])))",
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(FunCall(Variable(:f), [PositionalArg(Variable(:x))], [])))",
         """
         \"\"\"
         ...
         \"\"\"
         function f end   
-        """ => "DocstringStmt(\"...\\n\", ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing)))"
+        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing)))",
+        """
+        \"\"\"
+        ... \$testme end
+        \"\"\"
+        function f end   
+        """ => "DocstringStmt(StringInterpolate([\"... \", Variable(:testme), \" end\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing)))"
     ]
 ]
 

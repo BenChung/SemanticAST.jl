@@ -109,7 +109,7 @@ end
 	ModuleStmt(std_imports::Bool, name::Symbol, body::Vector{ToplevelStmts})
 	ExprStmt(expr::Expression)
 	ToplevelStmt(exprs::Vector{ToplevelStmts})
-    DocstringStmt(doc::String, defn::ToplevelStmts)
+    DocstringStmt(doc::Expression, defn::ToplevelStmts)
 end
 
 @ast_data Expression <: ASTNode begin
@@ -148,7 +148,7 @@ end
 	Generator(flatten::Bool, expr::Expression, iterators::Vector{Iterspec})
 	Comprehension(type::Union{Expression, Nothing}, gen::Generator)
 	Quote(ast::JuliaSyntax.SyntaxNode)
-    Docstring(doc::String, defn::Expression)
+    Docstring(doc::Expression, defn::Expression)
     Ternary(cond::Expression, then::Expression, els::Expression)
 end
 
