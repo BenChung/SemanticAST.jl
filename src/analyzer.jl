@@ -187,6 +187,7 @@ resolve_function_name(e, ctx) = @match e begin
 		else 
 			TypeFuncName(expand_forms(receiver, ctx), [let param = extract_implicit_whereparam(arg, ctx); isnothing(param) ? expand_forms(arg, ctx) : param end for arg in args], e)
 		end
+    SN(GuardBy(JuliaSyntax.is_operator) && GuardBy((!) ∘ JuliaSyntax.is_dotted), _) && name => ResolvedName([Expr(name)], e) # so are non-dotted operators
 	nothing => AnonFuncName(e)
 	_ => throw(ASTException(e, "invalid function name"))
 end
