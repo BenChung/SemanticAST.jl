@@ -403,6 +403,9 @@ expr_tests() = [
     :typerel => [
         "x <: y" => "FunCall(Variable(:<:), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], [])",
         "x >: y" => "FunCall(Variable(:>:), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], [])"
+    ],
+    :transpose => [
+        "x'" => "FunCall(Variable(Symbol(\"'\")), [PositionalArg(Variable(:x))], [])"
     ]
 ]
 

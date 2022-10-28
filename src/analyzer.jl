@@ -643,6 +643,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"string", _), args) => StringInterpolate(string_interpoland.(args, (ctx, )), ast)
     (SH(K"::", _), [_]) => throw(ASTException(ast, "invalid \"::\" syntax"))
     (SH(K"::", _), [val, typ]) => TypeAssert(expand_forms(val, ctx), expand_forms(typ, ctx), ast)
+	(SH(K"'", _), [mat]) => FunCall(Variable(Symbol("'"), ast), split_arguments([mat], ctx)..., ast)
     (SH(K"if", _), params) => expand_if(ast, params, ctx)
     (SH(K"while", _), [cond, body]) => let ictx = ExpandCtx(ctx; is_loop=true); WhileStmt(expand_forms(cond, ictx), expand_forms(body, ictx), ast) end
     (SH(K"break", _), _) => if ctx.is_loop BreakStmt(ast) else throw(ASTException(ast, "break or continue outside loop")) end
@@ -676,6 +677,6 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"?", _), [cond, then, els]) => Ternary(expand_forms(cond, ctx), expand_forms(then, ctx), expand_forms(els, ctx), ast)
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => throw(ASTException(ast, "must be at top level"))
 	(SH(op && GuardBy(JuliaSyntax.is_operator), _ && GuardBy(JuliaSyntax.is_dotted)), _) => Broadcast(Variable(Symbol(string(op)), ast), ast)
-	(SH(GuardBy(JuliaSyntax.is_operator), _), _) => Variable(Expr(ast), ast)
+	(SH(GuardBy(JuliaSyntax.is_operator), _), _) => try Variable(Expr(ast), ast) catch e println(ast); rethrow(e) end
     (head, args) => throw("Unimplemented $head")
 end
