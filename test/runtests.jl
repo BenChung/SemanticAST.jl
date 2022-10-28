@@ -399,6 +399,10 @@ expr_tests() = [
         "false" => "Literal(false)",
         "'c'" => "Literal('c')",
         "3" => "Literal(3)",
+    ],
+    :typerel => [
+        "x <: y" => "FunCall(Variable(:<:), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], [])",
+        "x >: y" => "FunCall(Variable(:>:), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], [])"
     ]
 ]
 
