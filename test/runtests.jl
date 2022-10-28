@@ -115,7 +115,9 @@ expr_tests() = [
 		"function foo(;x ; y) end" => ErrorResult(),
 		"function foo(;(x,y)...) end" => ErrorResult(),
 		"function foo{; a}() end" => ErrorResult(),
-		"function foo{a=y}() end" => ErrorResult()
+		"function foo{a=y}() end" => ErrorResult(),
+        "function foo(a::b = 9) end" => "FunctionDef(ResolvedName([:foo]), [FnArg(IdentifierAssignment(:a), Literal(9), Variable(:b))], [], [], nothing, Block([]))",
+        "function foo(a::b = 9, b::c = 17) end" => "FunctionDef(ResolvedName([:foo]), [FnArg(IdentifierAssignment(:a), Literal(9), Variable(:b)), FnArg(IdentifierAssignment(:b), Literal(17), Variable(:c))], [], [], nothing, Block([]))",
 	],
 	:macro => [
 		"macro foo end" => "MacroDef(ResolvedName([:foo]), [], [], nothing, nothing)",

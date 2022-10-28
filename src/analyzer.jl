@@ -146,7 +146,7 @@ analyze_argument(expr, is_kw, ctx) = @match (expr, is_kw) begin
 	(SN(SH(K"tuple", _), _), false) => (FnArg(analyze_lvalue(expr, ctx), nothing, nothing, expr), false)
 	(SN(SH(K"::", _), [binding && GuardBy(check_recursive_assignment), typ]), false) => (FnArg(analyze_lvalue(binding, ctx), nothing, expand_forms(typ, ctx), expr), false)
 	(SN(SH(K"::", _), [typ]), false) => (FnArg(nothing, nothing, expand_forms(typ, ctx), expr), false)
-	(SN(SH(K"kw", _), [head, default]), is_kw) => (let (base, _) = analyze_argument(head, is_kw, ctx); FnArg(base.binding, expand_forms(default, ctx), base.type, expr) end, true)
+	(SN(SH(K"kw", _), [head, default]), is_kw) => (let (base, _) = analyze_argument(head, false, ctx); FnArg(base.binding, expand_forms(default, ctx), base.type, expr) end, true)
 	(SN(SH(K"...", _), [bound]), false) => (FnArg(VarargAssignment(analyze_lvalue(bound, ctx), expr), nothing, nothing, expr), false)
 	(SN(SH(K"...", _), []), false) => (FnArg(VarargAssignment(nothing, expr), nothing, nothing, expr), false)
 	(_, false) => (FnArg(analyze_lvalue(expr, ctx), nothing, nothing, expr), false)
