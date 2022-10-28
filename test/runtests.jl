@@ -377,7 +377,7 @@ expr_tests() = [
         Foo Bar Baz
         \"\"\"
         function x() end
-        """ => "Docstring(StringInterpolate([\"Foo Bar Baz\\n\"]), FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([])))"
+        """ => "MacroExpansion(SemanticAST.Docstring(StringInterpolate([\"Foo Bar Baz\\n\"]), FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([]))))"
     ],
     :boolops => [
         "a && b" => "FunCall(Variable(:&&), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])",
@@ -474,61 +474,61 @@ toplevel_tests() = [
         Foo Bar Baz
         \"\"\"
         function x() end
-        """ => "DocstringStmt(StringInterpolate([\"Foo Bar Baz\\n\"]), ExprStmt(FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([]))))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"Foo Bar Baz\\n\"]), ExprStmt(FunctionDef(ResolvedName([:x]), [], [], [], nothing, Block([])))))",
         """
         \"\"\"
         ...
         \"\"\"
         const a = 1
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_CONST)])))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_CONST)]))))",
         """
         \"\"\"
         ...
         \"\"\"
         global a = 1
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_GLOBAL)])))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_GLOBAL)]))))",
         """
         \"\"\"
         ...
         \"\"\"
         baremodule M end
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ModuleStmt(false, :M, []))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ModuleStmt(false, :M, [])))",
         """
         \"\"\"
         ...
         \"\"\"
         module M end
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ModuleStmt(true, :M, []))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ModuleStmt(true, :M, [])))",
         """
         \"\"\"
         ...
         \"\"\"
         abstract type T1 end
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), AbstractDefStmt(:T1, Symbol[], nothing))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), AbstractDefStmt(:T1, Symbol[], nothing)))",
         """
         \"\"\"
         ...
         \"\"\"
         mutable struct T2 end
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), StructDefStmt(:T2, Symbol[], nothing, [], []))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), StructDefStmt(:T2, Symbol[], nothing, [], [])))",
         """
         \"\"\"
         ...
         \"\"\"
         struct T3 end
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), StructDefStmt(:T3, Symbol[], nothing, [], []))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), StructDefStmt(:T3, Symbol[], nothing, [], [])))",
         """
         \"\"\"
         ...
         \"\"\"
         macro m(x) end
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], nothing, Block([]))))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(MacroDef(ResolvedName([:m]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], nothing, Block([])))))",
         """
         \"\"\"
         ...
         \"\"\"
         f(x) = x
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x)))))",
         """
         \"\"\"
         ...
@@ -536,25 +536,49 @@ toplevel_tests() = [
         function f(x)
             x
         end        
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing, Block([Variable(:x)]))))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing, Block([Variable(:x)])))))",
         """
         \"\"\"
         ...
         \"\"\"
         f(x)    
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(FunCall(Variable(:f), [PositionalArg(Variable(:x))], [])))",
+        """ => "MacroExpansionStmt(SemanticAST.CallDocstring(StringInterpolate([\"...\\n\"]), ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing))",
         """
         \"\"\"
         ...
         \"\"\"
         function f end   
-        """ => "DocstringStmt(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing)))",
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing))))",
         """
         \"\"\"
         ... \$testme end
         \"\"\"
         function f end   
-        """ => "DocstringStmt(StringInterpolate([\"... \", Variable(:testme), \" end\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing)))"
+        """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"... \", Variable(:testme), \" end\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing))))",
+        """
+        \"\"\"
+        ... \$testme end
+        \"\"\"
+        foo(bar::baz)::bing
+        """ => "MacroExpansionStmt(SemanticAST.CallDocstring(StringInterpolate([\"... \", Variable(:testme), \" end\\n\"]), ResolvedName([:foo]), [FnArg(IdentifierAssignment(:bar), nothing, Variable(:baz))], [], [], Variable(:bing)))",
+        """
+        \"\"\"
+        ... \$testme end
+        \"\"\"
+        foo(bar::baz)::bing where Bar
+        """ => "MacroExpansionStmt(SemanticAST.CallDocstring(StringInterpolate([\"... \", Variable(:testme), \" end\\n\"]), ResolvedName([:foo]), [FnArg(IdentifierAssignment(:bar), nothing, Variable(:baz))], [], [], WhereType(Variable(:bing), [TyVar(:Bar, nothing, nothing)])))",
+        """
+        \"\"\"
+        ... testme end
+        \"\"\"
+        foo(bar; baz::Int = 2)
+        """ => "MacroExpansionStmt(SemanticAST.CallDocstring(StringInterpolate([\"... testme end\\n\"]), ResolvedName([:foo]), [FnArg(IdentifierAssignment(:bar), nothing, nothing)], [KwArg(:baz, Variable(:Int), Literal(2), false)], [], nothing))",
+        """
+        \"\"\"
+        ... testme end
+        \"\"\"
+        foo(bar; baz::Int = 2)::Int
+        """ => "MacroExpansionStmt(SemanticAST.CallDocstring(StringInterpolate([\"... testme end\\n\"]), ResolvedName([:foo]), [FnArg(IdentifierAssignment(:bar), nothing, nothing)], [KwArg(:baz, Variable(:Int), Literal(2), false)], [], Variable(:Int)))"
     ]
 ]
 

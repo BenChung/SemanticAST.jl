@@ -391,7 +391,7 @@ end
 
 analyze_kw_param(expr, ctx) = @match expr begin 
 	SN(SH(K"parameters", _), [params...]) => throw(ASTException(expr, "more than one semicolon in argument list"))
-	SN(SH(K"=" || K"kw", _), [name, value]) => KeywordArg(Expr(name), expand_forms(value, ctx), expr)
+	SN(SH(K"=" || K"kw", _), [name && SN(SH(K"Identifier", _), _), value]) => KeywordArg(Expr(name), expand_forms(value, ctx), expr)
 	SN(SH(K"Identifier", _), _) && name => KeywordArg(Expr(name), expand_forms(name, ctx), expr)
 	SN(SH(K".", _), [_, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) => KeywordArg(Expr(field), expand_forms(expr, ctx), expr)
 	_ => throw("inexhaustive $expr")
@@ -530,18 +530,41 @@ expand_tuple_arg(expr, ctx) = @match expr begin
     _ => expand_forms(expr, ctx)
 end
 
+@data Docstrings begin
+    Docstring(doc::Expression, defn::Union{Expression, ToplevelStmts})
+    CallDocstring(doc::Expression, name::FunctionName, arguments::Vector{FnArg}, kw_args::Vector{KwArg}, sparams::Vector{TyVar}, rett::Union{Expression, Nothing})
+end
+
+expand_docstring(expand, args, ast, ctx) = @match args begin
+    [docs, SN(SH(K"::", _), [SN(SH(K"call" || K"where", _), _) && fn, typ])] => let (name, args, kwargs, sparams, rett) = expand_function_name(fn,ctx); CallDocstring(expand_forms(docs, ctx), name, args, kwargs, sparams, expand_forms(typ, ctx)) end
+    [docs, SN(SH(K"call" || K"where", _), _) && fn] => CallDocstring(expand_forms(docs, ctx), expand_function_name(fn, ctx)...)
+    [docs, inner_ast] => Docstring(expand_forms(docs, ctx), expand(inner_ast, ctx))
+end
+
+resolve_toplevel_macro(ast, macroname, args, ctx) = @match macroname begin
+    SN(SH(K"core_@doc", _), _) => MacroExpansionStmt(expand_docstring(expand_toplevel, args, ast, ctx), ast)
+    _ => MacroExpansionStmt(Literal(:placeholder, ast), ast)
+end
+resolve_macro(ast, macroname, args, ctx) = @match macroname begin
+    SN(SH(K"core_@doc", _), _) => MacroExpansion(expand_docstring(expand_forms, args, ast, ctx), ast)
+    _ => MacroExpansion(Literal(:placeholder, ast), ast)
+end
+
 struct ExpandCtx 
 	is_toplevel::Bool
 	is_loop::Bool
 	in_module::Bool
-	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false; in_module=false) = new(is_toplevel, is_loop, in_module)
+    macro_resolver::Function
+    toplevel_macro_resolver::Function
+	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false; in_module=false, macroresolver=resolve_macro, tlresolver=resolve_toplevel_macro) = new(is_toplevel, is_loop, in_module, macroresolver, tlresolver)
 	ExpandCtx(base; 
 		is_toplevel::Union{Bool, Nothing}=nothing, 
 		is_loop::Union{Bool, Nothing}=nothing,
 		in_module::Union{Bool, Nothing}=nothing) = new(
 			isnothing(is_toplevel) ? false : is_toplevel, 
 			isnothing(is_loop) ? base.is_loop : is_loop,
-			isnothing(in_module) ? false : in_module)
+			isnothing(in_module) ? false : in_module,
+            base.macro_resolver, base.toplevel_macro_resolver)
 end
 
 next_ctx(head, ctx) = ExpandCtx(ctx)
@@ -561,7 +584,7 @@ expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin
     SN(SH(K"struct", _), [mut, sig, fields]) => expand_struct_def(ast, node_to_bool(mut), sig, fields, ctx)
     SN(SH(K"primitive", _), [sig, size]) => expand_primitive_def(ast, sig, size, ctx)
     SN(SH(K"toplevel", _), exprs) => ToplevelStmt(expand_toplevel.(exprs, (ctx, )), ast)
-	SN(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), docs, inner_ast]) => DocstringStmt(expand_forms(docs, ctx), expand_toplevel(inner_ast, ctx), ast)
+    SN(SH(K"macrocall", _), [name, args...]) => ctx.toplevel_macro_resolver(ast, name, args, ctx)
 	expr => ExprStmt(expand_forms(expr, JuliaSyntax.head(expr), JuliaSyntax.children(expr), ExpandCtx(ctx; is_toplevel = true)), ast)
 end
 
@@ -648,8 +671,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"comprehension", _), [generator]) => Comprehension(expand_generator(generator, ctx), ast)
     (SH(K"typed_comprehension", _), [type, generator]) => Comprehension(expand_forms(type, ctx), expand_generator(generator, ctx), ast)
 	(SH(K"Identifier", _), _) => Variable(Expr(ast), ast)
-	(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), docs, inner_ast]) => Docstring(expand_forms(docs, ctx), expand_forms(inner_ast, ctx), ast)
-	(SH(K"macrocall", _), [mcro, ast...]) => handle_macrocall(mcro, ast)
+	(SH(K"macrocall", _), [mcro, args...]) => ctx.macro_resolver(ast, mcro, args, ctx)
     (SH(K"?", _), [cond, then, els]) => Ternary(expand_forms(cond, ctx), expand_forms(then, ctx), expand_forms(els, ctx), ast)
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => throw(ASTException(ast, "must be at top level"))
 	(SH(op && GuardBy(JuliaSyntax.is_operator), _ && GuardBy(JuliaSyntax.is_dotted)), _) => Broadcast(Variable(Symbol(string(op)), ast), ast)
