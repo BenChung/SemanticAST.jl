@@ -402,7 +402,7 @@ function split_arguments(args, ctx; down=expand_forms)
 	for arg in args 
 		@match arg begin 
 			SN(SH(K"parameters", _), [params...]) => append!(kw_args, analyze_kw_call(params, ctx))
-			SN(SH(K"kw", _), [name, value]) => push!(kw_args, KeywordArg(Expr(name), down(value, ctx), arg))
+			SN(SH(K"kw", _), [SN(SH(K"Identifier", _), _) && name, value]) => push!(kw_args, KeywordArg(Expr(name), down(value, ctx), arg))
 			SN(SH(K"...", _), [arg]) => push!(pos_args, SplatArg(down(arg, ctx), arg))
 			expr => push!(pos_args, PositionalArg(down(expr, ctx), arg))
 		end
