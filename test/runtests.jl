@@ -280,8 +280,12 @@ expr_tests() = [
 		"while true 2+3 end" => "WhileStmt(Literal(true), Block([FunCall(Variable(:+), [PositionalArg(Literal(2)), PositionalArg(Literal(3))], [])]))",
 	],
 	:break => [
-		"break" => ErrorResult()
-		"while true; break end" => "WhileStmt(Literal(true), Block([BreakStmt()]))"
+		"break" => ErrorResult(),
+		"while true; break end" => "WhileStmt(Literal(true), Block([BreakStmt()]))",
+		"for i=1:10; break end" => "ForStmt([IdentifierAssignment(:i) => FunCall(Variable(:(:)), [PositionalArg(Literal(1)), PositionalArg(Literal(10))], [])], Block([BreakStmt()]))",
+		"for i=1:10; if true break end end" => "ForStmt([IdentifierAssignment(:i) => FunCall(Variable(:(:)), [PositionalArg(Literal(1)), PositionalArg(Literal(10))], [])], Block([IfStmt([IfClause(Literal(true), Block([BreakStmt()]))])]))",
+        "while break; 2 end" => "WhileStmt(BreakStmt(), Block([Literal(2)]))",
+        "for i in [break;] 2 end" => "ForStmt([IdentifierAssignment(:i) => VCat(nothing, [BreakStmt()])], Block([Literal(2)]))"
 	],
 	:continue => [
 		"continue" => ErrorResult()
