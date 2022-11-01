@@ -224,7 +224,7 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 		name = check_dotop(name)
 	end
 	varargs_indices = findall(arg -> arg.binding isa VarargAssignment, args_stmts)
-	if !isempty(varargs_indices) && last(varargs_indices) != length(varargs_indices)
+	if !isempty(varargs_indices) && last(varargs_indices) != length(args_stmts)
 		throw(ASTException(call, "invalid \"...\" on non-final argument"))
 	end
 	get_fnarg_name = @λ begin 
