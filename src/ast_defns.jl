@@ -163,6 +163,7 @@ end
 	NamedTupleAssignment(params::Vector{Union{IdentifierAssignment, TypedAssignment}})
 	FunctionAssignment(name::FunctionName, args_stmts::Vector{FnArg}, kwargs_stmts::Vector{KwArg}, sparams::Vector{TyVar}, rett::Union{Expression, Nothing})
 	BroadcastAssignment(lhs::LValue)
+    UnionAllAssignment(name::LValue, tyargs::Vector{TyVar})
 end
 
 @generated function Base.show(io::IO, a::T) where T<:Union{Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg, TyVar, KwArg, StructField}

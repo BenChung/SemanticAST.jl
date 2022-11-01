@@ -228,7 +228,9 @@ expr_tests() = [
         "f() = 3" => "Assignment(FunctionAssignment(ResolvedName([:f]), [], [], [], nothing), Literal(3))",
         "f(x) = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))",
         "f(x::T) where T = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, nothing, nothing)], nothing), Variable(:x))", 
-        "f(x::T) where T <: V = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, Variable(:V), nothing)], nothing), Variable(:x))"
+        "f(x::T) where T <: V = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, Variable(:V), nothing)], nothing), Variable(:x))",
+        "x{y} = 2" => "Assignment(UnionAllAssignment(IdentifierAssignment(:x), [TyVar(:y, nothing, nothing)]), Literal(2))",
+        "x{} = 2" => ErrorResult()
 	],
 	:comparison => [
 		"a < b < c" => "Comparison(Variable(:a), [Variable(:<) => Variable(:b), Variable(:<) => Variable(:c)])",

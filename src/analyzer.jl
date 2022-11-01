@@ -110,6 +110,7 @@ analyze_lvalue(expr, ctx; is_for=false) = @match expr begin
 	SN(SH(K"::", _), [x, T]) => TypedAssignment(analyze_lvalue(x, ctx), expand_forms(T, ctx), expr)
 	SN(SH(K"vcat" || K"ncat", _), _) => throw(ASTException(expr, "use \"(a, b) = ...\" to assign multiple values"))
 	SN(SH(K"call" || K"where", _), _) && name => FunctionAssignment(expand_function_name(name, ctx)..., expr)
+    SN(SH(K"curly", _), [name, tyargs...]) => length(tyargs) == 0 ? throw(ASTException(expr, "empty type parameter list")) : UnionAllAssignment(analyze_lvalue(name, ctx), analyze_typevar.(tyargs, (ctx, )), expr)
 	SN(SH(K"outer", _), [SN(SH(K"Identifier", _), _) && id]) =>  
 		if is_for 
 			OuterIdentifierAssignment(Expr(id), expr) 
