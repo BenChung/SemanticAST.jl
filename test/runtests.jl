@@ -345,6 +345,11 @@ expr_tests() = [
 	:typed_ncat => [
 		"x[1 ;; 2 ;; 3]" => "NCat(Variable(:x), 2, [Literal(1), Literal(2), Literal(3)])"
 	],
+    :comprehension => [
+        "[x for x in y]" => "Comprehension(nothing, Generator(false, Variable(:x), [IterEq(IdentifierAssignment(:x), Variable(:y))]))",
+        "[x for x in y if z]" => "Comprehension(nothing, Generator(false, Variable(:x), [Filter([IterEq(IdentifierAssignment(:x), Variable(:y))], Variable(:z))]))",
+        "Int[x for x in z, w in l]" =>  "Comprehension(Variable(:Int), Generator(false, Variable(:x), [IterEq(IdentifierAssignment(:x), Variable(:z)), IterEq(IdentifierAssignment(:w), Variable(:l))]))"
+    ],
 	:generator => [
 		"(return x for x in y)" => ErrorResult(),
 		"(x for a in as)" => "Generator(false, Variable(:x), [IterEq(IdentifierAssignment(:a), Variable(:as))])",
