@@ -656,7 +656,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"for", _), [SN(SH(K"block", _), iterspecs), body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx) for iterspec in iterspecs], expand_forms(body, ictx), ast) end
     (SH(K"&&", _), [l, r]) => FunCall(Variable(:(&&), ast), split_arguments([l, r], ctx)..., ast)
     (SH(K"||", _), [l, r]) => FunCall(Variable(:(||), ast), split_arguments([l, r], ctx)..., ast)
-    (SH(K"&", _), _) => throw(ASTException(ast, "invalid syntax"))
+#    (SH(K"&", _), _) => throw(ASTException(ast, "invalid syntax")) # really not sure what this was here for?
     (SH(upd && GuardBy(is_update), _ && GuardBy(JuliaSyntax.is_dotted)), [lhs, rhs]) => Update(Symbol(upd), analyze_lvalue(lhs,ctx), expand_forms(rhs, ctx), true, ast)
     (SH(upd && GuardBy(is_update), _), [lhs, rhs]) => Update(Symbol(upd), analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), false, ast)
     (SH(K"$", _), _) => throw(ASTException(ast, "\"\$\" expression outside quote"))
