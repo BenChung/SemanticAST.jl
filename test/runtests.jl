@@ -119,7 +119,8 @@ expr_tests() = [
         "function foo(a::b = 9) end" => "FunctionDef(ResolvedName([:foo]), [FnArg(IdentifierAssignment(:a), Literal(9), Variable(:b))], [], [], nothing, Block([]))",
         "function foo(a::b = 9, b::c = 17) end" => "FunctionDef(ResolvedName([:foo]), [FnArg(IdentifierAssignment(:a), Literal(9), Variable(:b)), FnArg(IdentifierAssignment(:b), Literal(17), Variable(:c))], [], [], nothing, Block([]))",
         "function -(a, b) end" => "FunctionDef(ResolvedName([:-]), [FnArg(IdentifierAssignment(:a), nothing, nothing), FnArg(IdentifierAssignment(:b), nothing, nothing)], [], [], nothing, Block([]))",
-        "function .-(a, b) end" => ErrorResult()
+        "function .-(a, b) end" => ErrorResult(),
+        "function f(;x...) end" => nothing
 	],
 	:macro => [
 		"macro foo end" => "MacroDef(ResolvedName([:foo]), [], [], nothing, nothing)",
@@ -182,7 +183,8 @@ expr_tests() = [
 		"a +₁ b +₁ c" => "FunCall(Variable(:+₁), [PositionalArg(FunCall(Variable(:+₁), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
 		"a .+ b .+ c" => "FunCall(Broadcast(Variable(:+)), [PositionalArg(FunCall(Broadcast(Variable(:+)), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
 		"f(a).g(b)" => "FunCall(GetProperty(FunCall(Variable(:f), [PositionalArg(Variable(:a))], []), :g), [PositionalArg(Variable(:b))], [])",
-		"foo(;x ; y)" => ErrorResult()
+		"foo(;x ; y)" => ErrorResult(),
+        "f(;x...)" => nothing
 	],
 	:unionall => [
 		"A where B" => "WhereType(Variable(:A), [TyVar(:B, nothing, nothing)])",

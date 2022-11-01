@@ -159,7 +159,7 @@ analyze_kwargs(expr, ctx) = @match expr begin
 		KwArg(Expr(name), expand_forms(type, ctx), expand_forms(body, ctx), expr)
 	end
 	SN(SH(K"kw", _), [SN(SH(K"Identifier", _), _) && name, body]) => KwArg(Expr(name), nothing, expand_forms(body, ctx), expr)
-	SN(SH(K"...", _), [SN(SH(K"Identifier", _), _) && name]) => KwArg(Expr(name), nothing, nothing, expr; is_vararg=true)
+	SN(SH(K"...", _), [SN(SH(K"Identifier", _), _) && name]) => KwArg(Expr(name), nothing, nothing, expr, true)
 	SN(SH(K"kw", _), [SN(SH(K"::", _), [name, type]), body]) => throw(ASTException(expr, "is not a valid function argument name"))
 	SN(SH(K"kw", _), [name, body]) => throw(ASTException(expr, "is not a valid function argument name"))
 	SN(SH(K"...", _), [name]) => throw(ASTException(expr, "is not a valid function argument name"))
@@ -395,6 +395,7 @@ analyze_kw_param(expr, ctx) = @match expr begin
 	SN(SH(K"=" || K"kw", _), [name && SN(SH(K"Identifier", _), _), value]) => KeywordArg(Expr(name), expand_forms(value, ctx), expr)
 	SN(SH(K"Identifier", _), _) && name => KeywordArg(Expr(name), expand_forms(name, ctx), expr)
 	SN(SH(K".", _), [_, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) => KeywordArg(Expr(field), expand_forms(expr, ctx), expr)
+    SN(SH(K"...", _), [splat]) => SplatArg(expand_forms(splat, ctx), expr)
 	_ => throw("inexhaustive $expr")
 end
 analyze_kw_call(params, ctx) = map(x -> analyze_kw_param(x, ctx), params)
