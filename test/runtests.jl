@@ -242,7 +242,8 @@ expr_tests() = [
 		"x[2]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2))])",
 		"x[2,3]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), PositionalArg(Literal(3))])",
 		"x[2,x=3; z=9]" => ErrorResult(),
-		"x[2,z...; y=0]" => ErrorResult()
+		"x[2,z...; y=0]" => ErrorResult(),
+        "x[y=3]" => "GetIndex(Variable(:x), [PositionalArg(Assignment(IdentifierAssignment(:y), Literal(3)))])"
 	],
 	:do => [
 		"f() do ; end" => "DoStatement(FunCall(Variable(:f), [], []), [], Block([]))",

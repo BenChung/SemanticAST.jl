@@ -614,7 +614,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH((K"const" || K"local" || K"global") && decltype, _), decls) => Declaration(expand_declaration.(convert_decltype(decltype), decls, (ctx, )), ast)
     (SH(K"=", _), [lhs, rhs]) => Assignment(analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), ast)
     (SH(K"ref", _), [arr, idxes..., SN(SH(K"parameters", _), _)]) => throw(ASTException(ast, "unexpected semicolon in array expression"))
-    (SH(K"ref", _), [arr, idxes...]) => GetIndex(expand_forms(arr, ctx), first(split_arguments(idxes, ctx)), ast)
+    (SH(K"ref", _), [arr, idxes...]) => GetIndex(expand_forms(arr, ctx), map(el->PositionalArg(expand_forms(el, ctx), el), idxes), ast)
     (SH(K"curly", _), [_, _..., SN(SH(K"parameters", _), _)]) => throw(ASTException(ast, "unexpected semicolon"))
     (SH(K"curly", _), [receiver, args...]) =>
 		if any(iskwarg, args) 
