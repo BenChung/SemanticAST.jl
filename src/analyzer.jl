@@ -1,4 +1,3 @@
-
 isdecl(ast) = @match ast begin 
 	SN(SH(K"::", _), _) => true
 	_ => false
@@ -8,7 +7,7 @@ isassignment(ast) = @match ast begin
 	_ => false
 end
 iskwarg(ast) = @match ast begin 
-	SN(SH(K"kw", _), _) => true
+	SN(SH(K"=", _), _) => true
 	_ => false
 end
 identifier_name(ast) = @match ast begin 
@@ -129,7 +128,7 @@ expr_contains_p(pred, expr, filter = x -> true) =
 
 isparam = @λ begin SN(SH(K"parameters", _), _) => true; _ => false end
 contains_destructuring = @λ begin 
-	SN(SH(K"::" || K"=" || K"kw", _), _) => true
+	SN(SH(K"::" || K"=", _), _) => true
 	_ => false 
 end
 is_return = @λ begin 
@@ -147,7 +146,7 @@ analyze_argument(expr, is_kw, ctx) = @match (expr, is_kw) begin
 	(SN(SH(K"tuple", _), _), false) => (FnArg(analyze_lvalue(expr, ctx), nothing, nothing, expr), false)
 	(SN(SH(K"::", _), [binding && GuardBy(check_recursive_assignment), typ]), false) => (FnArg(analyze_lvalue(binding, ctx), nothing, expand_forms(typ, ctx), expr), false)
 	(SN(SH(K"::", _), [typ]), false) => (FnArg(nothing, nothing, expand_forms(typ, ctx), expr), false)
-	(SN(SH(K"kw", _), [head, default]), is_kw) => (let (base, _) = analyze_argument(head, false, ctx); FnArg(base.binding, expand_forms(default, ctx), base.type, expr) end, true)
+	(SN(SH(K"=", _), [head, default]), is_kw) => (let (base, _) = analyze_argument(head, false, ctx); FnArg(base.binding, expand_forms(default, ctx), base.type, expr) end, true)
 	(SN(SH(K"...", _), [bound]), false) => (FnArg(VarargAssignment(analyze_lvalue(bound, ctx), expr), nothing, nothing, expr), false)
 	(SN(SH(K"...", _), []), false) => (FnArg(VarargAssignment(nothing, expr), nothing, nothing, expr), false)
 	(_, false) => (FnArg(analyze_lvalue(expr, ctx), nothing, nothing, expr), false)
@@ -156,13 +155,13 @@ analyze_argument(expr, is_kw, ctx) = @match (expr, is_kw) begin
 end
 analyze_kwargs(expr, ctx) = @match expr begin 
 	SN(SH(K"parameters", _), _) => throw(ASTException(expr, "more than one semicolon in argument list"))
-	SN(SH(K"kw", _), [SN(SH(K"::", _), [SN(SH(K"Identifier", _), ) && name, type]), body]) => begin
+	SN(SH(K"=", _), [SN(SH(K"::", _), [SN(SH(K"Identifier", _), ) && name, type]), body]) => begin
 		KwArg(Expr(name), expand_forms(type, ctx), expand_forms(body, ctx), expr)
 	end
-	SN(SH(K"kw", _), [SN(SH(K"Identifier", _), _) && name, body]) => KwArg(Expr(name), nothing, expand_forms(body, ctx), expr)
+	SN(SH(K"=", _), [SN(SH(K"Identifier", _), _) && name, body]) => KwArg(Expr(name), nothing, expand_forms(body, ctx), expr)
 	SN(SH(K"...", _), [SN(SH(K"Identifier", _), _) && name]) => KwArg(Expr(name), nothing, nothing, expr, true)
-	SN(SH(K"kw", _), [SN(SH(K"::", _), [name, type]), body]) => throw(ASTException(expr, "is not a valid function argument name"))
-	SN(SH(K"kw", _), [name, body]) => throw(ASTException(expr, "is not a valid function argument name"))
+	SN(SH(K"=", _), [SN(SH(K"::", _), [name, type]), body]) => throw(ASTException(expr, "is not a valid function argument name"))
+	SN(SH(K"=", _), [name, body]) => throw(ASTException(expr, "is not a valid function argument name"))
 	SN(SH(K"...", _), [name]) => throw(ASTException(expr, "is not a valid function argument name"))
 	SN(SH(K"Identifier", _), _) && ident => KwArg(Expr(ident), nothing, nothing, expr)
 	SN(SH(K"::", _), [SN(SH(K"Identifier", _), _) && ident, type]) => KwArg(Expr(ident), expand_forms(type, ctx), nothing, expr)
@@ -213,7 +212,9 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 					throw(ASTException(call, "macros cannot accept keyword arguments"))
 				end
 		end
-	end #>=1 forbidden by parsing
+	elseif length(params) > 1
+        throw(ASTException(call, "more than one semicolon in argument list"))
+    end
 	if !isnothing(name)
 		if is_macro
 			@match name begin
@@ -393,7 +394,7 @@ end
 
 analyze_kw_param(expr, ctx) = @match expr begin 
 	SN(SH(K"parameters", _), [params...]) => throw(ASTException(expr, "more than one semicolon in argument list"))
-	SN(SH(K"=" || K"kw", _), [name && SN(SH(K"Identifier", _), _), value]) => KeywordArg(Expr(name), expand_forms(value, ctx), expr)
+	SN(SH(K"=", _), [name && SN(SH(K"Identifier", _), _), value]) => KeywordArg(Expr(name), expand_forms(value, ctx), expr)
 	SN(SH(K"Identifier", _), _) && name => KeywordArg(Expr(name), expand_forms(name, ctx), expr)
 	SN(SH(K".", _), [_, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) => KeywordArg(Expr(field), expand_forms(expr, ctx), expr)
     SN(SH(K"...", _), [splat]) => SplatArg(expand_forms(splat, ctx), expr)
@@ -402,10 +403,17 @@ end
 analyze_kw_call(params, ctx) = map(x -> analyze_kw_param(x, ctx), params)
 function split_arguments(args, ctx; down=expand_forms)
 	pos_args = []; kw_args = []
+    has_parameters = false
 	for arg in args 
 		@match arg begin 
-			SN(SH(K"parameters", _), [params...]) => append!(kw_args, analyze_kw_call(params, ctx))
-			SN(SH(K"kw", _), [SN(SH(K"Identifier", _), _) && name, value]) => push!(kw_args, KeywordArg(Expr(name), down(value, ctx), arg))
+			SN(SH(K"parameters", _), [params...]) => 
+                if !has_parameters 
+                    append!(kw_args, analyze_kw_call(params, ctx))
+                    has_parameters = true
+                else 
+                    throw(ASTException(arg, "more than one semicolon in argument list"))
+                end
+			SN(SH(K"=", _), [SN(SH(K"Identifier", _), _) && name, value]) => push!(kw_args, KeywordArg(Expr(name), down(value, ctx), arg))
 			SN(SH(K"...", _), [arg]) => push!(pos_args, SplatArg(down(arg, ctx), arg))
 			expr => push!(pos_args, PositionalArg(down(expr, ctx), arg))
 		end
@@ -445,11 +453,11 @@ expand_declaration(decltype, expr, ctx) = @match expr begin
 	SN(SH(GuardBy(JuliaSyntax.is_prec_assignment), _), [lhs, rhs]) => VarDecl(analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), decltype, expr)
 end
 expand_named_tuple_arg(expr, ctx) = @match expr begin 
-	SN(SH(K"kw" || K"=", _), [SN(SH(K"Identifier", _), _) && name, rhs]) => NamedValue(Expr(name), expand_forms(rhs, ctx), expr)
-	SN(SH(K"kw" || K"=", _), [lhs, rhs]) => throw(ASTException(expr, "invalid name"))
+	SN(SH(K"=", _), [SN(SH(K"Identifier", _), _) && name, rhs]) => NamedValue(Expr(name), expand_forms(rhs, ctx), expr)
+	SN(SH(K"=", _), [lhs, rhs]) => throw(ASTException(expr, "invalid name"))
 	SN(SH(K"Identifier", _), _) && name => NamedValue(Expr(name), expand_forms(name, ctx), expr)
 	SN(SH(K".", _), [rec, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) && ast => NamedValue(Expr(field), expand_forms(ast, ctx), expr)
-	SN(SH(K"call", GuardBy(JuliaSyntax.is_infix)), [lhs, SN(SH(K"=>", _), _), rhs]) => ComputedNamedValue(expand_forms(lhs, ctx), expand_forms(rhs, ctx), expr)
+	SN(SH(K"call", GuardBy(JuliaSyntax.is_infix_op_call)), [lhs, SN(SH(K"=>", _), _), rhs]) => ComputedNamedValue(expand_forms(lhs, ctx), expand_forms(rhs, ctx), expr)
     SN(SH(K"...", _), [splat]) => SplattedNamedValue(expand_forms(splat, ctx), expr)
 	expr => throw("invalid $expr")
 end
@@ -593,7 +601,7 @@ end
 
 expand_forms(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = expand_forms(ast, JuliaSyntax.head(ast), JuliaSyntax.children(ast), next_ctx(JuliaSyntax.head(ast), ctx))
 expand_forms(ast, head, children, ctx) = @match (head, children) begin
-	(SH(K"Float" || K"Integer" || K"String" || K"Char" || K"true" || K"false", _), _) => Literal(Expr(ast), ast)
+	(SH(K"Float" || K"Integer" || K"String" || K"Char" || K"char" || K"true" || K"false", _), _) => Literal(Expr(ast), ast)
     (SH(K"quote",_), _) => Quote(ast, ast) # need to port bits of macroexpansion into this
     (SH(K"function", _), [name, body]) => FunctionDef(expand_function_name(name, ctx)..., expand_forms(body, ctx), ast)
     (SH(K"function", _), [name]) => FunctionDef(expand_function_name(name, ctx)..., nothing, ast)
@@ -603,8 +611,6 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"macro", _), [SN(SH(K"call", _), _) && name, body]) => MacroDef(expand_macro_name(name, ctx)..., expand_forms(body, ctx), ast)
     (SH(K"macro", _), [SN(SH(K"Identifier", _), _) && name]) => MacroDef(expand_macro_name(name, ctx)..., nothing, ast)
     (SH(K"macro", _), _) => throw(ASTException(ast, "invalid macro definition"))
-    (SH(K"try", _ && GuardBy(x->JuliaSyntax.has_flags(x, JuliaSyntax.TRY_CATCH_AFTER_FINALLY_FLAG))), 
-		[block, SN(SH(K"false", _), _), SN(SH(K"false", _), _), else_block, finally_block, catch_var, catch_block]) => TryCatch(expand_forms(block, ctx), ifnotfalse(catch_var, x->Expr(x)), ifnotfalse(catch_block, x -> expand_forms(x, ctx)), ifnotfalse(else_block, x -> expand_forms(x, ctx)), ifnotfalse(finally_block, x -> expand_forms(x, ctx)), ast)
     (SH(K"try", _), [block, catch_var, catch_block, else_block, finally_block]) => TryCatch(expand_forms(block, ctx), ifnotfalse(catch_var, x->Expr(x)), ifnotfalse(catch_block, x -> expand_forms(x, ctx)), ifnotfalse(else_block, x -> expand_forms(x, ctx)), ifnotfalse(finally_block, x -> expand_forms(x, ctx)), ast)
     (SH(K"block", _), stmts) => Block(expand_forms.(stmts, (ctx, )), ast)
     (SH(K".", _), [op]) => Broadcast(expand_forms(op, ctx), ast)
@@ -629,7 +635,9 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
 		else 
 			CallCurly(expand_forms(receiver, ctx), [let param = extract_implicit_whereparam(arg, ctx); isnothing(param) ? expand_forms(arg, ctx) : param end for arg in args], ast)
 		end
-	(SH(K"call", GuardBy(JuliaSyntax.is_infix)), [arg1, f, arg2]) => FunCall(expand_forms(f, ctx), split_arguments([arg1, arg2], ctx)..., ast) # todo Global method definition needs to be placed at the toplevel
+	(SH(K"call", GuardBy(JuliaSyntax.is_infix_op_call)), [arg1, f, arg2]) => FunCall(expand_forms(f, ctx), split_arguments([arg1, arg2], ctx)..., ast) # todo Global method definition needs to be placed at the toplevel
+    (SH(K"call", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(expand_forms(f, ctx), split_arguments([arg], ctx)..., ast)
+    (SH(K"call", GuardBy(JuliaSyntax.is_prefix_op_call)), [f, arg]) => FunCall(expand_forms(f, ctx), [PositionalArg(expand_forms(arg, ctx), ast)], [], ast)
 	(SH(K"call", _), [f, args...]) => FunCall(expand_forms(f, ctx), split_arguments(args, ctx)..., ast)
 	(SH(K"call", _), [SN(SH(K".", _), [op]), args]) => FunCall(Broadcast(expand_forms(op, ctx)), split_arguments(args, ctx)..., ast)
     (SH(K"do", _), [call, args, body]) => 
@@ -645,7 +653,6 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"string", _), args) => StringInterpolate(string_interpoland.(args, (ctx, )), ast)
     (SH(K"::", _), [_]) => throw(ASTException(ast, "invalid \"::\" syntax"))
     (SH(K"::", _), [val, typ]) => TypeAssert(expand_forms(val, ctx), expand_forms(typ, ctx), ast)
-	(SH(K"'", _), [mat]) => FunCall(Variable(Symbol("'"), ast), split_arguments([mat], ctx)..., ast)
     (SH(K"if", _), params) => expand_if(ast, params, ctx)
     (SH(K"while", _), [cond, body]) => let ictx = ExpandCtx(ctx; is_loop=true); WhileStmt(expand_forms(cond, ictx), expand_forms(body, ictx), ast) end
     (SH(K"break", _), _) => if ctx.is_loop BreakStmt(ast) else throw(ASTException(ast, "break or continue outside loop")) end

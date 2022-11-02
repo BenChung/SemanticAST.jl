@@ -38,7 +38,6 @@ flag_assignment = Dict{Symbol, UInt16}(
 	:DOTOP => JuliaSyntax.DOTOP_FLAG,
 	:TRIPLE_STRING => JuliaSyntax.TRIPLE_STRING_FLAG,
 	:RAW_STRING => JuliaSyntax.RAW_STRING_FLAG,
-	:TRY_CATCH_AFTER_FINALLY => JuliaSyntax.TRY_CATCH_AFTER_FINALLY_FLAG,
 	:SUFFIXED => JuliaSyntax.SUFFIXED_FLAG
 )
 @active InfixHead(x) begin

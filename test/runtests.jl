@@ -143,8 +143,7 @@ expr_tests() = [
 		"try x catch \n y end" => "TryCatch(Block([Variable(:x)]), nothing, Block([Variable(:y)]), nothing, nothing)",
 		"try x catch e y end" => "TryCatch(Block([Variable(:x)]), :e, Block([Variable(:y)]), nothing, nothing)",
 		"try x finally y end" => "TryCatch(Block([Variable(:x)]), nothing, nothing, nothing, Block([Variable(:y)]))",
-		"try catch ; else end" => "TryCatch(Block([]), nothing, Block([]), Block([]), nothing)",
-		"try x finally y catch e z end" => "TryCatch(Block([Variable(:x)]), :e, Block([Variable(:z)]), nothing, Block([Variable(:y)]))"
+		"try catch ; else end" => "TryCatch(Block([]), nothing, Block([]), Block([]), nothing)"
 	],
 	:curly => [
 		"a{;a}" => ErrorResult(),
@@ -185,7 +184,8 @@ expr_tests() = [
 		"a .+ b .+ c" => "FunCall(Broadcast(Variable(:+)), [PositionalArg(FunCall(Broadcast(Variable(:+)), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
 		"f(a).g(b)" => "FunCall(GetProperty(FunCall(Variable(:f), [PositionalArg(Variable(:a))], []), :g), [PositionalArg(Variable(:b))], [])",
 		"foo(;x ; y)" => ErrorResult(),
-        "f(;x...)" => "FunCall(Variable(:f), [], [SplatArg(Variable(:x))])"
+        "f(;x...)" => "FunCall(Variable(:f), [], [SplatArg(Variable(:x))])",
+        "+(x=1)" => "FunCall(Variable(:+), [PositionalArg(Assignment(IdentifierAssignment(:x), Literal(1)))], [])"
 	],
 	:unionall => [
 		"A where B" => "WhereType(Variable(:A), [TyVar(:B, nothing, nothing)])",
@@ -197,8 +197,7 @@ expr_tests() = [
 	],
 	:const => [
 		"const a = 1" => "Declaration([VarDecl(IdentifierAssignment(:a), Literal(1), DECL_CONST)])",
-		"const a::Int = 1" => "Declaration([VarDecl(TypedAssignment(IdentifierAssignment(:a), Variable(:Int)), Literal(1), DECL_CONST)])",
-		"const a" => ErrorResult()
+		"const a::Int = 1" => "Declaration([VarDecl(TypedAssignment(IdentifierAssignment(:a), Variable(:Int)), Literal(1), DECL_CONST)])"
 	],
 	:local => [
 		"local a" => "Declaration([VarDecl(IdentifierAssignment(:a), nothing, DECL_LOCAL)])",
@@ -242,7 +241,7 @@ expr_tests() = [
 	:ref => [
 		"x[2]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2))], [])",
 		"x[2,3]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), PositionalArg(Literal(3))], [])",
-		"x[2,x=3; z=9]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), PositionalArg(Assignment(IdentifierAssignment(:x), Literal(3)))], [KeywordArg(:z, Literal(9))])",
+		"x[2,x=3; z=9]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2))], [KeywordArg(:x, Literal(3)), KeywordArg(:z, Literal(9))])",
 		"x[2,z...; y=0]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), SplatArg(Variable(:z))], [KeywordArg(:y, Literal(0))])"
 	],
 	:do => [
