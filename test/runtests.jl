@@ -239,10 +239,10 @@ expr_tests() = [
 		"a .< b == c" => "Comparison(Variable(:a), [Broadcast(Variable(:<)) => Variable(:b), Variable(:(==)) => Variable(:c)])"
 	],
 	:ref => [
-		"x[2]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2))], [])",
-		"x[2,3]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), PositionalArg(Literal(3))], [])",
-		"x[2,x=3; z=9]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2))], [KeywordArg(:x, Literal(3)), KeywordArg(:z, Literal(9))])",
-		"x[2,z...; y=0]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), SplatArg(Variable(:z))], [KeywordArg(:y, Literal(0))])"
+		"x[2]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2))])",
+		"x[2,3]" => "GetIndex(Variable(:x), [PositionalArg(Literal(2)), PositionalArg(Literal(3))])",
+		"x[2,x=3; z=9]" => ErrorResult(),
+		"x[2,z...; y=0]" => ErrorResult()
 	],
 	:do => [
 		"f() do ; end" => "DoStatement(FunCall(Variable(:f), [], []), [], Block([]))",

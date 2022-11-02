@@ -124,7 +124,7 @@ end
 	Comparison(first::Expression, clauses::Vector{Pair{Expression, Expression}})
 	Broadcast(op::Expression)
 	FunCall(receiver::Expression, pos_args::Vector{PositionalArgs}, kw_args::Vector{Union{KeywordArg, SplatArg}})
-	GetIndex(arr::Expression, arguments::Vector{PositionalArgs}, kwargs::Vector{Union{KeywordArg, SplatArg}})
+	GetIndex(arr::Expression, arguments::Vector{PositionalArgs})
 	GetProperty(rec::Expression, prop::Union{Symbol, Literal})
 	Assignment(lhs::LValue, rhs::Expression)
 	Update(op::Symbol, lhs::LValue, rhs::Expression, dotted::Bool)

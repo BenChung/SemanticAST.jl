@@ -421,20 +421,6 @@ function split_arguments(args, ctx; down=expand_forms)
 	return pos_args, kw_args
 end
 
-#=
-partially_expand_ref = @λ begin 
-	SN(SH(K"ref", _), [arr, idxes]) => GetIndex(expand_forms(arr), split_arguments(idxes)...)
-end
-commented out b/c it's not a complete match
-=# 
-function ref_to_view(e, ctx)
-	@match e begin 
-		SN(SH(K"ref", _), [arr, idxes...]) => GetIndex(expand_forms(arr, ctx), split_arguments(idxes, ctx)...)
-		SN(SH(K".", _), [l, r]) => GetProperty(expand_forms(arr, ctx), Literal(Expr(r)))
-		_ => expand_forms(e, ctx)
-	end
-end
-
 expand_broadcast(e) = dot_to_fuse(e)
 
 convert_decltype = @λ begin 
@@ -627,7 +613,8 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"where", _), [typ, vars...]) => WhereType(expand_forms(typ, ctx), analyze_typevar.(vars, (ctx, )), ast)
     (SH((K"const" || K"local" || K"global") && decltype, _), decls) => Declaration(expand_declaration.(convert_decltype(decltype), decls, (ctx, )), ast)
     (SH(K"=", _), [lhs, rhs]) => Assignment(analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), ast)
-    (SH(K"ref", _), [arr, idxes...]) => GetIndex(expand_forms(arr, ctx), split_arguments(idxes, ctx)..., ast)
+    (SH(K"ref", _), [arr, idxes..., SN(SH(K"parameters", _), _)]) => throw(ASTException(ast, "unexpected semicolon in array expression"))
+    (SH(K"ref", _), [arr, idxes...]) => GetIndex(expand_forms(arr, ctx), first(split_arguments(idxes, ctx)), ast)
     (SH(K"curly", _), [_, _..., SN(SH(K"parameters", _), _)]) => throw(ASTException(ast, "unexpected semicolon"))
     (SH(K"curly", _), [receiver, args...]) =>
 		if any(iskwarg, args) 
