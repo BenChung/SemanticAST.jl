@@ -502,19 +502,19 @@ end
 expand_import_source = @λ begin 
 	SN(SH(K".", _), path) => expand_import_path(path)
 end
-expand_import_clause(expr) = @match expr begin 
-	SN(SH(K".", _), path) => Dep(expand_import_path(path), expr)
-	SN(SH(K"as", _), [SN(SH(K".", _), path), SN(SH(K"Identifier", _), _) && alias]) => AliasDep(expand_import_path(path), Expr(alias), expr)
+expand_import_clause(expr; allow_relative=true) = @match expr begin 
+	SN(SH(K".", _), path) => Dep(expand_import_path(path; allow_relative=allow_relative), expr)
+	SN(SH(K"as", _), [SN(SH(K".", _), path), SN(SH(K"Identifier", _), _) && alias]) => AliasDep(expand_import_path(path; allow_relative=allow_relative), Expr(alias), expr)
 end
 
-function expand_import_path(src_path)
+function expand_import_path(src_path; allow_relative=true)
 	path = nothing
 	for path_el in src_path 
 		path = @match (path_el, path) begin
 			(SN(SH(K"Identifier" || K"MacroName", _), _) && id, nothing) => ImportId(Expr(id), path_el)
 			(SN(SH(K"Identifier" || K"MacroName", _), _) && id, path) => ImportField(path, Expr(id), path_el)
-			(SN(SH(K".", _), _), nothing) => ImportRelative(1, path_el)
-			(SN(SH(K".", _), _), ImportRelative(lvl, _)) => ImportRelative(lvl+1, path_el)
+			(SN(SH(K".", _), _), nothing) => allow_relative ? ImportRelative(1, path_el) : throw(ASTException(path_el, "invalid path: \".\" in identifier path"))
+			(SN(SH(K".", _), _), ImportRelative(lvl, _)) =>  allow_relative ? ImportRelative(lvl+1, path_el) : throw(ASTException(path_el, "invalid path: \".\" in identifier path"))
 			(SN(SH(K".", _), _), _) => throw(ASTException(src_path, "invalid path: \".\" in identifier path"))
 			(_, _) => throw(ASTException(path_el, "invalid path"))
 		end
@@ -571,9 +571,9 @@ function handle_macrocall(mcro, ast)
 end
 
 expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin 
-    SN(SH(K"using", _), [SN(SH(K":", _), [mod, terms...])]) => SourceUsingStmt(expand_import_source(mod), expand_import_clause.(terms), ast)
+    SN(SH(K"using", _), [SN(SH(K":", _), [mod, terms...])]) => SourceUsingStmt(expand_import_source(mod), expand_import_clause.(terms; allow_relative=false), ast)
     SN(SH(K"using", _), [terms...]) => UsingStmt(expand_import_source.(terms), ast)
-    SN(SH(K"import", _), [SN(SH(K":", _), [mod, terms...])]) => SourceImportStmt(expand_import_source(mod), expand_import_clause.(terms), ast)
+    SN(SH(K"import", _), [SN(SH(K":", _), [mod, terms...])]) => SourceImportStmt(expand_import_source(mod), expand_import_clause.(terms; allow_relative=false), ast)
     SN(SH(K"import", _), [terms...]) => ImportStmt(expand_import_clause.(terms), ast)
     SN(SH(K"export", _), syms) => ExportStmt(Expr.(syms), ast)
     SN(SH(K"module", _), [stdimports, name, SN(SH(K"block", _), stmts)]) => ModuleStmt(Expr(stdimports), Expr(name), expand_toplevel.(stmts, (ctx, )), ast)
