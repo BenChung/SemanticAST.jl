@@ -12,6 +12,7 @@ Base.show(io::IO, pos::SourcePosition) = begin print(io, "SourcePosition") end
 	ub::Any
 	lb::Any
 end
+export TyVar
 
 abstract type LValue <: ASTNode end
 @ast_node struct FnArg <: ASTNode
@@ -19,6 +20,7 @@ abstract type LValue <: ASTNode end
 	default_value::Union{ASTNode, Nothing}
     type::Union{Expression, Nothing}
 end
+export FnArg, LValue
 
 struct KwArg <: ASTNode
 	name::Symbol
@@ -30,6 +32,7 @@ struct KwArg <: ASTNode
 end
 @as_record KwArg
 Base.:(==)(a::KwArg, b::KwArg) = a.name == b.name && a.type == b.type && a.default_value == b.default_value && a.is_vararg == b.is_vararg
+export KwArg
 
 @enum FieldAttributes FIELD_NONE=0 FIELD_CONST=1
 Base.show(io::IO, d::FieldAttributes) = print(io, d)
@@ -39,6 +42,8 @@ Base.:(|)(a::FieldAttributes, b::FieldAttributes) = FieldAttributes(Int(a) | Int
 	type::Union{Expression, Nothing}
 	attributes::FieldAttributes
 end
+export StructField, FieldAttributes
+
 Base.:(==)(a::StructField, b::StructField) = a.name == b.name && a.type == b.type && a.attributes == b.attributes
 
 @ast_data CallArg <: ASTNode begin 
@@ -46,8 +51,10 @@ Base.:(==)(a::StructField, b::StructField) = a.name == b.name && a.type == b.typ
 	KeywordArg(name::Symbol, value::Expression)
 	SplatArg(body::Union{Expression, Nothing})
 end
+export CallArg, PositionalArg, KeywordArg, SplatArg
 
 const PositionalArgs = Union{PositionalArg, SplatArg}
+export PositionalArgs
 
 @enum DeclAttributes DECL_NONE=0 DECL_CONST=1 DECL_LOCAL=2 DECL_GLOBAL=4
 Base.show(io::IO, d::DeclAttributes) = print(io, d)
@@ -56,39 +63,46 @@ Base.show(io::IO, d::DeclAttributes) = print(io, d)
 	value::Union{Expression, Nothing}
 	flags::DeclAttributes
 end
+export VarDecl
 
 @ast_data NamedTupleBody <: ASTNode begin
 	NamedValue(name::Symbol, value::Expression)
 	ComputedNamedValue(name::Expression, value::Expression)
     SplattedNamedValue(splat::Expression)
 end
+export NamedTupleBody, NamedValue, ComputedNamedValue, SplattedNamedValue
 
 @ast_node struct IfClause <: ASTNode
 	cond::Union{Expression, Nothing}
 	body::Expression
 end
+export IfClause
 
 @ast_data Rows <: ASTNode begin 
 	Splat(body::Expression)
 	Row(elems::Vector{Union{Expression, Splat}})
 	NRow(dim::Int, elems::Vector{Union{NRow, Expression}})
 end
+export Rows, Splat, Row, NRow
 
 @ast_data Iterspec <: ASTNode begin 
 	IterEq(lhs::LValue, rhs::Expression)
 	Filter(inner::Vector{Iterspec}, cond::Expression)
 end
+export Iterspec, IterEq, Filter
 
 @ast_data ImportPath <: ASTNode begin
 	ImportField(source::ImportPath, name::Symbol)
 	ImportId(name::Symbol)
 	ImportRelative(levels::Int)
 end
+export ImportPath, ImportField, ImportId, ImportRelative
 
 @ast_data DepClause <: ASTNode begin
 	Dep(path::ImportPath)
 	AliasDep(path::ImportPath, alias::Symbol)
 end
+export DepClause, Dep, AliasDep
 
 @ast_data FunctionName <: ASTNode begin 
 	ResolvedName(path::Vector{Symbol})
@@ -96,6 +110,7 @@ end
 	TypeFuncName(receiver::Expression, args::Vector{Union{Expression, TyVar}})
 	AnonFuncName()
 end
+export FunctionName, ResolvedName, DeclName, TypeFuncName, AnonFuncName
 
 @ast_data ToplevelStmts <: ASTNode begin 
 	StructDefStmt(name::Symbol, params::Vector{Symbol}, super::Union{Expression, Nothing}, fields::Vector{StructField}, cstrs::Vector{Expression})
@@ -111,6 +126,7 @@ end
 	ToplevelStmt(exprs::Vector{ToplevelStmts})
     MacroExpansionStmt(value::Any)
 end
+export ToplevelStmts, StructDefStmt, AbstractDefStmt, PrimitiveDefStmt, UsingStmt, ImportStmt, SourceUsingStmt, SourceImportStmt, ExportStmt, ModuleStmt, ExprStmt, ToplevelStmt, MacroExpansionStmt
 
 @ast_data Expression <: ASTNode begin
 	Literal(expr::Any)
@@ -151,6 +167,7 @@ end
     MacroExpansion(value::Any)
     Ternary(cond::Expression, then::Expression, els::Expression)
 end
+export Expression, Literal, Variable, FunctionDef, MacroDef, Block, LetBinding, TryCatch, CallCurly, Comparison, Broadcast, FunCall, GetIndex, GetProperty, Assignment, Update, WhereType, Declaration, DoStatement, TupleExpr, NamedTupleExpr, StringInterpolate, TypeAssert, IfStmt, WhileStmt, BreakStmt, ContinueStmt, ReturnStmt, ForStmt, Vect, HCat, VCat, NCat, Generator, Comprehension, Quote, MacroExpansion, Ternary
 
 @ast_data LValueImpl <: LValue begin 
 	IdentifierAssignment(id::Symbol)
@@ -165,6 +182,7 @@ end
 	BroadcastAssignment(lhs::LValue)
     UnionAllAssignment(name::LValue, tyargs::Vector{TyVar})
 end
+export LValueImpl, IdentifierAssignment, OuterIdentifierAssignment, FieldAssignment, TupleAssignment, RefAssignment, VarargAssignment, TypedAssignment, NamedTupleAssignment, FunctionAssignment, BroadcastAssignment, UnionAllAssignment
 
 @generated function Base.show(io::IO, a::T) where T<:Union{Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg, TyVar, KwArg, StructField}
 	outbody = []

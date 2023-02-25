@@ -9,6 +9,13 @@ const SH = JuliaSyntax.SyntaxHead
 childof = JuliaSyntax.child
 kindof(ex) = JuliaSyntax.kind(JuliaSyntax.head(ex))
 
+@testset "visit" begin
+	y = 0
+	enter = (x) -> y = 1
+	exit = (x) -> begin @test y == 1; y = 2 end
+	SemanticAST.visit(enter, exit, SemanticAST.StringInterpolate([], nothing))
+	@test y == 2
+end
 
 af1 = JuliaSyntax.parseall(SN, "function () end")
 af2 = JuliaSyntax.parseall(SN, "function (x) end")
@@ -382,12 +389,12 @@ expr_tests() = [
 		"module Foo end" => ErrorResult()
 	],
 	:let => [
-		"let x = y; z end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[IdentifierAssignment(:x) => Variable(:y)], Block([Variable(:z)]))",
-		"let ; z end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[], Block([Variable(:z)]))",
+		"let x = y; z end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[IdentifierAssignment(:x) => Variable(:y)], Block([Variable(:z)]))",
+		"let ; z end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[], Block([Variable(:z)]))",
 		"let 2+2; 34 end" => ErrorResult(),
-		"let x() = 3; x() end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[FunctionAssignment(ResolvedName([:x]), [], [], [], nothing) => Literal(3)], Block([FunCall(Variable(:x), [], [])]))",
-		"let x; 2 end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[:x], Block([Literal(2)]))",
-		"let (x, y) = 2; 2 end" => "LetBinding(Union{Symbol, Pair{<:SemanticAST.LValue, <:SemanticAST.Expression}}[TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]) => Literal(2)], Block([Literal(2)]))"
+		"let x() = 3; x() end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[FunctionAssignment(ResolvedName([:x]), [], [], [], nothing) => Literal(3)], Block([FunCall(Variable(:x), [], [])]))",
+		"let x; 2 end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[:x], Block([Literal(2)]))",
+		"let (x, y) = 2; 2 end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]) => Literal(2)], Block([Literal(2)]))"
 	],
     :docstring => [
         """
@@ -631,7 +638,9 @@ end
 			if output isa ErrorResult
 				@test_throws ASTException expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
 			else 
-				@test string(expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))) == output
+				ast = expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
+				SemanticAST.visit((x) -> nothing, y->nothing, ast)
+				@test string(ast) == output
 			end
 		end
 	end

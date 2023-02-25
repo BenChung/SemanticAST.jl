@@ -83,7 +83,17 @@ macro ast_data(name, body)
 	end
 	for elem in body.args
 		@match elem begin 
-			:($casename($(params...))) => push!(outbody, :(@ast_node struct $casename <: $supertype; $(params...) end))
+			:($casename($(params...))) => begin
+				push!(outbody, :(@ast_node struct $casename <: $supertype; $(params...) end))
+				visit_body = []
+				for param in params 
+					@match param begin
+						:($fldname::$fldtype) && fldspec => begin
+							push!(visit_body, :(visit(enter, exit, arg.$fldname)))
+						end
+					end
+				end
+			end
 			lnn :: LineNumberNode => push!(outbody, lnn)
 		end
 	end
@@ -119,9 +129,13 @@ macro ast_node(defn)
 					$prop($((:($argname) for (argname, argtype) in init_fields)...), basenode::Union{$JuliaSyntax.SyntaxNode, Nothing}) = 
 						new($((argname for (argname, argtype) in init_fields)...), isnothing(basenode) ? nothing : $SemanticAST.SourcePosition(basenode)) 
 				end;
+				function $(esc(:visit))(enter, exit, arg::$(esc(prop))) enter(arg); $((:(visit(enter, exit, arg.$argname)) for (argname, argtype) in init_fields)...); exit(arg) end
 				$MLStyle.@as_record $(esc(prop))
 			end
 			return out
 		end
 	end
 end
+
+visit(enter, exit, elems::Vector{T}) where T = for elem in elems visit(enter, exit,elem) end
+visit(enter, exit, alt) = begin enter(alt); exit(alt) end
