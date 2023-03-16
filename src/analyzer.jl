@@ -286,6 +286,7 @@ function analyze_let_eq(expr)
 		FunctionAssignment(name, _, _, _, _, _) => throw(ASTException(name.location.basenode, "invalid let syntax"))
 		TupleAssignment(_, _) && tup => tup
 		IdentifierAssignment(_, _) && id => id
+		TypedAssignment(_, _, _) && ty => ty
 		_ => throw(ASTException(expr, "invalid let syntax"))
 	end
 end
@@ -420,6 +421,13 @@ function split_arguments(args, ctx; down=expand_forms)
 	end
 	return pos_args, kw_args
 end
+function split_op_arguments(args, ctx; down=expand_forms)
+	pos_args = []; kw_args = []
+	for arg in args 
+		push!(pos_args, PositionalArg(down(arg, ctx), arg))
+	end
+	return pos_args, kw_args
+end
 
 expand_broadcast(e) = dot_to_fuse(e)
 
@@ -538,12 +546,28 @@ expand_docstring(expand, args, ast, ctx) = @match args begin
     [docs, inner_ast] => Docstring(expand_forms(docs, ctx), expand(inner_ast, ctx))
 end
 
-resolve_toplevel_macro(ast, macroname, args, ctx) = @match macroname begin
-    SN(SH(K"core_@doc", _), _) => MacroExpansionStmt(expand_docstring(expand_toplevel, args, ast, ctx), ast)
-    _ => MacroExpansionStmt(Literal(:placeholder, ast), ast)
+function resolve_toplevel_macro(ast, macroname, args, ctx) 
+	return @match macroname begin
+    	SN(SH(K"core_@doc", _), _) => MacroExpansionStmt(expand_docstring(expand_toplevel, args, ast, ctx), ast)
+		SN(SH(K"MacroName", _), ) => @match string(macroname.val) begin 
+		"@doc" => MacroExpansionStmt(expand_docstring(expand_forms, args, ast, ctx), ast)
+		"@inline" || "@noinline" => expand_toplevel(args[1], ctx)
+		"@assume_effects" || "@constprop" => expand_toplevel(args[2], ctx)
+			_ => throw(ASTException(macroname, "Unrecognized macro $(macroname.val)"))
+		end
+    	_ => MacroExpansionStmt(Literal(:placeholder, ast), ast)
+	end
 end
 resolve_macro(ast, macroname, args, ctx) = @match macroname begin
     SN(SH(K"core_@doc", _), _) => MacroExpansion(expand_docstring(expand_forms, args, ast, ctx), ast)
+	SN(SH(K"MacroName", _), ) => @match string(macroname.val) begin 
+		"@inline" || "@noinline" || "@inbounds" => expand_forms(args[1], ctx)
+		"@eval" => Literal(:(), ast) # no I'm not proud
+		"@horner" => FunCall(Variable(:evalpoly, ast), PositionalArg.([expand_forms(args[1], ctx), TupleExpr(expand_forms.(args[2:end], (ctx, )), ast)], (ast, )), Vector{Union{KeywordArg, SplatArg}}[], ast)
+		"@generated" => Literal(true, macroname)
+		"@assume_effects" => expand_toplevel(args[2], ctx)
+		_ => throw(ASTException(macroname, "Unrecognized macro $(macroname.val)"))
+	end
     _ => MacroExpansion(Literal(:placeholder, ast), ast)
 end
 
@@ -587,7 +611,7 @@ end
 
 expand_forms(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = expand_forms(ast, JuliaSyntax.head(ast), JuliaSyntax.children(ast), next_ctx(JuliaSyntax.head(ast), ctx))
 expand_forms(ast, head, children, ctx) = @match (head, children) begin
-	(SH(K"Float" || K"Integer" || K"String" || K"Char" || K"char" || K"true" || K"false", _), _) => Literal(Expr(ast), ast)
+	(SH(K"Float" || K"Integer" || K"String" || K"Char" || K"char" || K"true" || K"false" || K"HexInt", _), _) => Literal(Expr(ast), ast)
     (SH(K"quote",_), _) => Quote(ast, ast) # need to port bits of macroexpansion into this
     (SH(K"function", _), [name, body]) => FunctionDef(expand_function_name(name, ctx)..., expand_forms(body, ctx), ast)
     (SH(K"function", _), [name]) => FunctionDef(expand_function_name(name, ctx)..., nothing, ast)
@@ -604,8 +628,8 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
 	(SH(K".", _), [f, SN(SH(K"quote", _), [x]) && lit]) => GetProperty(expand_forms(f, ctx), Literal(Expr(x), lit), ast)
 	(SH(K".", _), [f, SN(SH(K"tuple", _), args)]) => FunCall(Broadcast(expand_forms(f, ctx), ast), split_arguments(args, ctx)..., ast)
 	(SH(K"comparison", _), [initial, args...]) => Comparison(expand_forms(initial, ctx), map((op, value) -> expand_forms(op, ctx) => expand_forms(value, ctx), args[1:2:end], args[2:2:end]), ast)
-	(SH(K"&&", _ && GuardBy(JuliaSyntax.is_dotted)), [l, r]) => FunCall(Broadcast(Variable(:(&&), ast), ast), split_arguments([l, r], ctx)..., ast)
-	(SH(K"||", _ && GuardBy(JuliaSyntax.is_dotted)), [l, r]) => FunCall(Broadcast(Variable(:(||), ast), ast), split_arguments([l, r], ctx)..., ast)
+	(SH(K"&&", _ && GuardBy(JuliaSyntax.is_dotted)), [l, r]) => FunCall(Broadcast(Variable(:(&&), ast), ast), split_op_arguments([l, r], ctx)..., ast)
+	(SH(K"||", _ && GuardBy(JuliaSyntax.is_dotted)), [l, r]) => FunCall(Broadcast(Variable(:(||), ast), ast), split_op_arguments([l, r], ctx)..., ast)
     (SH(K"=", _ && GuardBy(JuliaSyntax.is_dotted)), [lhs, rhs]) => Assignment(BroadcastAssignment(analyze_lvalue(lhs, ctx), ast), expand_forms(rhs, ctx), ast)
     (SH(K"<:", _), [a,b]) => FunCall(Variable(:(<:), ast), split_arguments([a, b], ctx)..., ast)
     (SH(K">:", _), [a,b]) => FunCall(Variable(:(>:), ast), split_arguments([a, b], ctx)..., ast)
@@ -622,8 +646,8 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
 		else 
 			CallCurly(expand_forms(receiver, ctx), [let param = extract_implicit_whereparam(arg, ctx); isnothing(param) ? expand_forms(arg, ctx) : param end for arg in args], ast)
 		end
-	(SH(K"call", GuardBy(JuliaSyntax.is_infix_op_call)), [arg1, f, arg2]) => FunCall(expand_forms(f, ctx), split_arguments([arg1, arg2], ctx)..., ast) # todo Global method definition needs to be placed at the toplevel
-    (SH(K"call", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(expand_forms(f, ctx), split_arguments([arg], ctx)..., ast)
+	(SH(K"call", GuardBy(JuliaSyntax.is_infix_op_call)), [arg1, f, arg2...]) && call => FunCall(expand_forms(f, ctx), split_op_arguments([arg1; arg2], ctx)..., ast) # todo Global method definition needs to be placed at the toplevel
+    (SH(K"call", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(expand_forms(f, ctx), split_op_arguments([arg], ctx)..., ast)
     (SH(K"call", GuardBy(JuliaSyntax.is_prefix_op_call)), [f, arg]) => FunCall(expand_forms(f, ctx), [PositionalArg(expand_forms(arg, ctx), ast)], [], ast)
 	(SH(K"call", _), [f, args...]) => FunCall(expand_forms(f, ctx), split_arguments(args, ctx)..., ast)
 	(SH(K"call", _), [SN(SH(K".", _), [op]), args]) => FunCall(Broadcast(expand_forms(op, ctx)), split_arguments(args, ctx)..., ast)
@@ -648,8 +672,8 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"return", _), [val]) => ReturnStmt(expand_forms(val, ctx), ast)
     (SH(K"for", _), [SN(SH(K"=", _), _) && iterspec, body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx)], expand_forms(body, ictx), ast) end
     (SH(K"for", _), [SN(SH(K"block", _), iterspecs), body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx) for iterspec in iterspecs], expand_forms(body, ictx), ast) end
-    (SH(K"&&", _), [l, r]) => FunCall(Variable(:(&&), ast), split_arguments([l, r], ctx)..., ast)
-    (SH(K"||", _), [l, r]) => FunCall(Variable(:(||), ast), split_arguments([l, r], ctx)..., ast)
+    (SH(K"&&", _), [l, r]) => FunCall(Variable(:(&&), ast), split_op_arguments([l, r], ctx)..., ast)
+    (SH(K"||", _), [l, r]) => FunCall(Variable(:(||), ast), split_op_arguments([l, r], ctx)..., ast)
 #    (SH(K"&", _), _) => throw(ASTException(ast, "invalid syntax")) # really not sure what this was here for?
     (SH(upd && GuardBy(is_update), _ && GuardBy(JuliaSyntax.is_dotted)), [lhs, rhs]) => Update(Symbol(upd), analyze_lvalue(lhs,ctx), expand_forms(rhs, ctx), true, ast)
     (SH(upd && GuardBy(is_update), _), [lhs, rhs]) => Update(Symbol(upd), analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), false, ast)

@@ -5,6 +5,12 @@ end
 
 first_byte(e::ASTException) = e.source_node.position
 last_byte(e::ASTException) = e.source_node.position + JuliaSyntax.span(e.source_node) - 1
+global ast_id::Int = 0
+function make_id()
+	old = ast_id
+	ast_id += 1
+	return ast_id
+end
 
 # stolen from JuliaSyntax in most part
 function Base.show(io::IO, exception::ASTException)
@@ -107,6 +113,8 @@ macro ast_node(defn)
 	@match defn begin 
 		:(struct $prop <: $super; $(fields...); end) => begin
 			output_body = []
+			hash_body = []
+			eq_body = []
 			init_fields = []
 			for field in fields
 				@match field begin 
@@ -117,10 +125,13 @@ macro ast_node(defn)
 							throw("Location specified explicitly; ast node locations are implicit!")
 						end
 						push!(output_body, fldspec)
+						push!(hash_body, :(h = hash(node.$fldname, h)))
+						push!(eq_body, :(self.$fldname == other.$fldname))
 					end
 					_::LineNumberNode => nothing
 				end
 			end
+			eq_check = foldl((exp, el) -> :($exp && $el), eq_body; init = :(self.location == other.location))
 
 			out = quote
 				struct $prop <: $super; 
@@ -130,6 +141,12 @@ macro ast_node(defn)
 						new($((argname for (argname, argtype) in init_fields)...), isnothing(basenode) ? nothing : $SemanticAST.SourcePosition(basenode)) 
 				end;
 				function $(esc(:visit))(enter, exit, arg::$(esc(prop))) enter(arg); $((:(visit(enter, exit, arg.$argname)) for (argname, argtype) in init_fields)...); exit(arg) end
+				function Base.hash(node::$(esc(prop)), h::UInt) 
+					$(hash_body...)
+					h = hash(node.location, h)
+					return h
+				end
+				Base.:(==)(self::$(esc(prop)), other::$(esc(prop))) = $eq_check
 				$MLStyle.@as_record $(esc(prop))
 			end
 			return out
@@ -138,4 +155,5 @@ macro ast_node(defn)
 end
 
 visit(enter, exit, elems::Vector{T}) where T = for elem in elems visit(enter, exit,elem) end
+visit(enter, exit, elem::Pair{T, U}) where {T, U} = begin visit(enter, exit, elem[1]); visit(enter, exit, elem[2]) end
 visit(enter, exit, alt) = begin enter(alt); exit(alt) end

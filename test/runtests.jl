@@ -180,13 +180,13 @@ expr_tests() = [
 		"a(x,y; y=2, z=3)" => "FunCall(Variable(:a), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], [KeywordArg(:y, Literal(2)), KeywordArg(:z, Literal(3))])",
 		"a(x, y...; z=9)" => "FunCall(Variable(:a), [PositionalArg(Variable(:x)), SplatArg(Variable(:y))], [KeywordArg(:z, Literal(9))])",
 		"a - b - c" => "FunCall(Variable(:-), [PositionalArg(FunCall(Variable(:-), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
-		"a + b + c" => "FunCall(Variable(:a), [PositionalArg(Variable(:+)), PositionalArg(Variable(:b)), PositionalArg(Variable(:c))], [])",
+		"a + b + c" => "FunCall(Variable(:+), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b)), PositionalArg(Variable(:c))], [])",
 		"a + b .+ c" => "FunCall(Broadcast(Variable(:+)), [PositionalArg(FunCall(Variable(:+), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
 		"[x +y]" => "HCat(nothing, [Variable(:x), FunCall(Variable(:+), [PositionalArg(Variable(:y))], [])])",
 		"[x+y +z]" => "HCat(nothing, [FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), FunCall(Variable(:+), [PositionalArg(Variable(:z))], [])])",
 		"[x +₁y]" => "Vect([FunCall(Variable(:+₁), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], [])])",
-		"[x+y+z]" => "Vect([FunCall(Variable(:x), [PositionalArg(Variable(:+)), PositionalArg(Variable(:y)), PositionalArg(Variable(:z))], [])])",
-		"[x+y + z]" => "Vect([FunCall(Variable(:x), [PositionalArg(Variable(:+)), PositionalArg(Variable(:y)), PositionalArg(Variable(:z))], [])])",
+		"[x+y+z]" => "Vect([FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y)), PositionalArg(Variable(:z))], [])])",
+		"[x+y + z]" => "Vect([FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y)), PositionalArg(Variable(:z))], [])])",
 		"a +₁ b +₁ c" => "FunCall(Variable(:+₁), [PositionalArg(FunCall(Variable(:+₁), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
 		"a .+ b .+ c" => "FunCall(Broadcast(Variable(:+)), [PositionalArg(FunCall(Broadcast(Variable(:+)), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])), PositionalArg(Variable(:c))], [])",
 		"f(a).g(b)" => "FunCall(GetProperty(FunCall(Variable(:f), [PositionalArg(Variable(:a))], []), :g), [PositionalArg(Variable(:b))], [])",
@@ -234,6 +234,7 @@ expr_tests() = [
 		"[a ;; b] = 2" => ErrorResult(),
         "f() = 3" => "Assignment(FunctionAssignment(ResolvedName([:f]), [], [], [], nothing), Literal(3))",
         "f(x) = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))",
+		"f(x)::Int = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], Variable(:Int)), Variable(:x))",
         "f(x::T) where T = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, nothing, nothing)], nothing), Variable(:x))", 
         "f(x::T) where T <: V = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, Variable(:V), nothing)], nothing), Variable(:x))",
         "x{y} = 2" => "Assignment(UnionAllAssignment(IdentifierAssignment(:x), [TyVar(:y, nothing, nothing)]), Literal(2))",
@@ -298,6 +299,10 @@ expr_tests() = [
 		"for i=1:10; if true break end end" => "ForStmt([IdentifierAssignment(:i) => FunCall(Variable(:(:)), [PositionalArg(Literal(1)), PositionalArg(Literal(10))], [])], Block([IfStmt([IfClause(Literal(true), Block([BreakStmt()]))])]))",
         "while break; 2 end" => "WhileStmt(BreakStmt(), Block([Literal(2)]))",
         "for i in [break;] 2 end" => "ForStmt([IdentifierAssignment(:i) => VCat(nothing, [BreakStmt()])], Block([Literal(2)]))"
+	],
+	:iterators => [
+		"1:10" => "FunCall(Variable(:(:)), [PositionalArg(Literal(1)), PositionalArg(Literal(10))], [])",
+		"1:10:5" => "FunCall(Variable(:(:)), [PositionalArg(Literal(1)), PositionalArg(Literal(10)), PositionalArg(Literal(5))], [])",
 	],
 	:continue => [
 		"continue" => ErrorResult()
@@ -394,7 +399,8 @@ expr_tests() = [
 		"let 2+2; 34 end" => ErrorResult(),
 		"let x() = 3; x() end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[FunctionAssignment(ResolvedName([:x]), [], [], [], nothing) => Literal(3)], Block([FunCall(Variable(:x), [], [])]))",
 		"let x; 2 end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[:x], Block([Literal(2)]))",
-		"let (x, y) = 2; 2 end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]) => Literal(2)], Block([Literal(2)]))"
+		"let (x, y) = 2; 2 end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]) => Literal(2)], Block([Literal(2)]))",
+		"let x::Real = 2; x end" => "LetBinding(Union{Symbol, Pair{<:LValue, <:Expression}}[TypedAssignment(IdentifierAssignment(:x), Variable(:Real)) => Literal(2)], Block([Variable(:x)]))",
 	],
     :docstring => [
         """
@@ -406,6 +412,7 @@ expr_tests() = [
     ],
     :boolops => [
         "a && b" => "FunCall(Variable(:&&), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])",
+		"x && (y = w)" => "FunCall(Variable(:&&), [PositionalArg(Variable(:x)), PositionalArg(Assignment(IdentifierAssignment(:y), Variable(:w)))], [])",
         "a || b" => "FunCall(Variable(:||), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])"
     ],
     :? => [
@@ -506,6 +513,18 @@ toplevel_tests() = [
 		"module Foo module Bar end end" => "ModuleStmt(true, :Foo, [ModuleStmt(true, :Bar, [])])",
 		"function f() module Foo module Bar end end end" => ErrorResult(),
         "baremodule Foo end" => "ModuleStmt(false, :Foo, [])"
+	],
+	:inline => [
+		"@inline function foobarbaz() end" => "ExprStmt(FunctionDef(ResolvedName([:foobarbaz]), [], [], [], nothing, Block([])))"
+		"function foo() @inline function bar() end end" => "ExprStmt(FunctionDef(ResolvedName([:foo]), [], [], [], nothing, Block([FunctionDef(ResolvedName([:bar]), [], [], [], nothing, Block([]))])))"
+	],
+	:noinline => [
+		"@noinline function foobarbaz() end" => "ExprStmt(FunctionDef(ResolvedName([:foobarbaz]), [], [], [], nothing, Block([])))"
+		"function foo() @noinline function bar() end end" => "ExprStmt(FunctionDef(ResolvedName([:foo]), [], [], [], nothing, Block([FunctionDef(ResolvedName([:bar]), [], [], [], nothing, Block([]))])))"
+	],
+	:other_macros => [
+		"@assume_effects :consistent function foobarbaz() end" => "ExprStmt(FunctionDef(ResolvedName([:foobarbaz]), [], [], [], nothing, Block([])))"
+		"if @generated; 2 else 3 end" => "ExprStmt(IfStmt([IfClause(Literal(true), Block([Literal(2)])), IfClause(nothing, Block([Literal(3)]))]))"
 	],
     :docstring => [
         """
