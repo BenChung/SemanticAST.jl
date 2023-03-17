@@ -143,7 +143,9 @@ export ToplevelStmts, StructDefStmt, AbstractDefStmt, PrimitiveDefStmt, UsingStm
 	GetIndex(arr::Expression, arguments::Vector{PositionalArgs})
 	GetProperty(rec::Expression, prop::Union{Symbol, Literal})
 	Assignment(lhs::LValue, rhs::Expression)
-	Update(op::Symbol, lhs::LValue, rhs::Expression, dotted::Bool)
+	BroadcastAssignment(lhs::Expression, rhs::Expression)
+	Update(op::Symbol, lhs::LValue, rhs::Expression)
+	BroadcastUpdate(op::Symbol, lhs::Expression, rhs::Expression)
 	WhereType(type::Expression, vars::Vector{TyVar})
 	Declaration(vars::Vector{VarDecl})
 	DoStatement(func::Expression, arguments::Vector{FnArg}, body::Expression)
@@ -179,7 +181,6 @@ export Expression, Literal, Variable, FunctionDef, MacroDef, Block, LetBinding, 
 	TypedAssignment(lhs::LValue, type::Expression)
 	NamedTupleAssignment(params::Vector{Union{IdentifierAssignment, TypedAssignment}})
 	FunctionAssignment(name::FunctionName, args_stmts::Vector{FnArg}, kwargs_stmts::Vector{KwArg}, sparams::Vector{TyVar}, rett::Union{Expression, Nothing})
-	BroadcastAssignment(lhs::LValue)
     UnionAllAssignment(name::LValue, tyargs::Vector{TyVar})
 end
 export LValueImpl, IdentifierAssignment, OuterIdentifierAssignment, FieldAssignment, TupleAssignment, RefAssignment, VarargAssignment, TypedAssignment, NamedTupleAssignment, FunctionAssignment, BroadcastAssignment, UnionAllAssignment

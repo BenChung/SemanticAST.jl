@@ -169,10 +169,11 @@ expr_tests() = [
 		"a.(2 .+ 2)" => "FunCall(Broadcast(Variable(:a)), [PositionalArg(FunCall(Broadcast(Variable(:+)), [PositionalArg(Literal(2)), PositionalArg(Literal(2))], []))], [])",
 		"a .&& b" => "FunCall(Broadcast(Variable(:&&)), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])",
 		"a .|| b" => "FunCall(Broadcast(Variable(:||)), [PositionalArg(Variable(:a)), PositionalArg(Variable(:b))], [])",
-		"a .= b" => "Assignment(BroadcastAssignment(IdentifierAssignment(:a)), Variable(:b))",
-		"a[5] .= b" => "Assignment(BroadcastAssignment(RefAssignment(Variable(:a), [PositionalArg(Literal(5))], [])), Variable(:b))",
-		"a[5, 6] .= b" => "Assignment(BroadcastAssignment(RefAssignment(Variable(:a), [PositionalArg(Literal(5)), PositionalArg(Literal(6))], [])), Variable(:b))",
-		"a[5, 6; w=9] .= b" => "Assignment(BroadcastAssignment(RefAssignment(Variable(:a), [PositionalArg(Literal(5)), PositionalArg(Literal(6))], [KeywordArg(:w, Literal(9))])), Variable(:b))"
+		"a .= b" => "BroadcastAssignment(Variable(:a), Variable(:b))",
+		"a[5] .= b" => "BroadcastAssignment(GetIndex(Variable(:a), [PositionalArg(Literal(5))]), Variable(:b))",
+		"a[5, 6] .= b" => "BroadcastAssignment(GetIndex(Variable(:a), [PositionalArg(Literal(5)), PositionalArg(Literal(6))]), Variable(:b))",
+		"x+y .= y" => "BroadcastAssignment(FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), Variable(:y))",
+		"x+y .+= y" => "BroadcastUpdate(:+=, FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), Variable(:y))"
 	],
 	:call => [
 		"a(x)" => "FunCall(Variable(:a), [PositionalArg(Variable(:x))], [])",
@@ -316,11 +317,11 @@ expr_tests() = [
 		"for outer x in y, z in l; w end" => "ForStmt([OuterIdentifierAssignment(:x) => Variable(:y), IdentifierAssignment(:z) => Variable(:l)], Block([Variable(:w)]))"
 	],
 	:update => [
-		"x += y" => "Update(:+=, IdentifierAssignment(:x), Variable(:y), false)",
-		"(x, y) += z" => "Update(:+=, TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]), Variable(:z), false)",
-		"x .+= y" => "Update(:+=, IdentifierAssignment(:x), Variable(:y), true)",
-		"(x, y) .+= z" => "Update(:+=, TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]), Variable(:z), true)",
-		"x.y += z" => "Update(:+=, FieldAssignment(Variable(:x), :y), Variable(:z), false)"
+		"x += y" => "Update(:+=, IdentifierAssignment(:x), Variable(:y))",
+		"(x, y) += z" => "Update(:+=, TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]), Variable(:z))",
+		"x .+= y" => "BroadcastUpdate(:+=, Variable(:x), Variable(:y))",
+		"(x, y) .+= z" => "BroadcastUpdate(:+=, TupleExpr([Variable(:x), Variable(:y)]), Variable(:z))",
+		"x.y += z" => "Update(:+=, FieldAssignment(Variable(:x), :y), Variable(:z))"
 	],
 	:vect => [
 		"[1,2,3]" => "Vect([Literal(1), Literal(2), Literal(3)])",
