@@ -245,18 +245,16 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 end
 
 function destructure_function_head(name)
-	raw_typevars = []
-	if kindof(name) == K"where"
-		(name, vars) = flatten_where_expr(name)
-		@match name begin 
-			SN(SH(K"call" || K"::" || K"tuple", _), _) => nothing
-			_ => throw(ASTException(name, "Invalid assignment location")) # I don't think that this should happen from parsed code?
+	(name, raw_typevars) = @match name begin 
+		SN(SH(K"::", _), [nexpr, SN(SH(K"where", _), _) && clause]) => begin 
+			return (nexpr, flatten_where_expr(clause)...)
 		end
-		raw_typevars = vars
-	end
-	decl, rett, name = @match name begin
-	    SN(SH(K"::", _), [true_name, typ]) => (true, typ, true_name)
-	    _ => (false, nothing, name) # todo return a valid thingie
+		SN(SH(K"where", _), _) => flatten_where_expr(name)
+		_ => (name, [])
+	end # this control flow is very cursed sorry
+	rett, name = @match name begin
+	    SN(SH(K"::", _), [true_name, typ]) => (typ, true_name)
+	    _ => (nothing, name) # todo return a valid thingie
 	end
 	return name, rett, raw_typevars
 end
