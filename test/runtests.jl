@@ -661,6 +661,7 @@ end
 		@testset "$input" for (input, output) in test_specs
 			if output isa ErrorResult
 				@test_throws ASTException expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
+				@test string(expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false; error_context=SemanticAST.SilentErrorReporting()))) != nothing
 			else 
 				ast = expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
 				SemanticAST.visit((x) -> nothing, y->nothing, ast)
