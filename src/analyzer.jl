@@ -2,23 +2,27 @@ abstract type ErrorReporting end
 struct ExceptionErrorReporting <: ErrorReporting end
 struct SilentErrorReporting <: ErrorReporting end
 
+abstract type MacroContext end
+struct DefaultMacroContext <: MacroContext end
 
-struct ExpandCtx{ER}
+
+struct ExpandCtx{ER <: ErrorReporting, MC <: MacroContext}
 	is_toplevel::Bool
 	is_loop::Bool
 	in_module::Bool
-    macro_resolver::Function
-    toplevel_macro_resolver::Function
+	macro_context::MC
 	error_context::ER
-	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false; in_module=false, macroresolver=resolve_macro, tlresolver=resolve_toplevel_macro, error_context::ER=ExceptionErrorReporting()) where ER = new{ER}(is_toplevel, is_loop, in_module, macroresolver, tlresolver, error_context)
-	ExpandCtx(base; 
+	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false; in_module=false,
+		 macro_context::MC=DefaultMacroContext(), error_context::ER=ExceptionErrorReporting()) where {ER, MC} = 
+		new{ER, MC}(is_toplevel, is_loop, in_module, macro_context, error_context)
+	ExpandCtx(base::ExpandCtx{ER, MC}; 
 		is_toplevel::Union{Bool, Nothing}=nothing, 
 		is_loop::Union{Bool, Nothing}=nothing,
-		in_module::Union{Bool, Nothing}=nothing) = new{typeof(base.error_context)}(
+		in_module::Union{Bool, Nothing}=nothing)  where {ER, MC}= new{ER, MC}(
 			isnothing(is_toplevel) ? false : is_toplevel, 
 			isnothing(is_loop) ? base.is_loop : is_loop,
 			isnothing(in_module) ? false : in_module,
-            base.macro_resolver, base.toplevel_macro_resolver, base.error_context)
+            base.macro_context, base.error_context)
 end
 
 handle_error(context::ExpandCtx, node::JuliaSyntax.SyntaxNode, reporting::ExceptionErrorReporting, message::String, continuation::Union{Function, Nothing}) = throw(ASTException(node, message))
@@ -605,35 +609,21 @@ expand_docstring(expand, args, ast, ctx) = @match args begin
     [docs, inner_ast] => Docstring(expand_forms(docs, ctx), expand(inner_ast, ctx))
 end
 
-function resolve_toplevel_macro(ast, macroname, args, ctx) 
-	return @match macroname begin
-    	SN(SH(K"core_@doc", _), _) => MacroExpansionStmt(expand_docstring(expand_toplevel, args, ast, ctx), ast)
-		SN(SH(K"MacroName", _), ) => @match string(macroname.val) begin 
-		"@doc" => MacroExpansionStmt(expand_docstring(expand_forms, args, ast, ctx), ast)
-		"@inline" || "@noinline" => expand_toplevel(args[1], ctx)
-		"@assume_effects" || "@constprop" => expand_toplevel(args[2], ctx)
-			_ => handle_error(ctx, macroname, ctx.error_context, "Unrecognized macro $(macroname.val)", () -> MacroExpansionStmt(Literal(:unknown, ast), ast))
-		end
-    	_ => MacroExpansionStmt(Literal(:placeholder, ast), ast)
-	end
-end
-resolve_macro(ast, macroname, args, ctx) = @match macroname begin
-    SN(SH(K"core_@doc", _), _) => MacroExpansion(expand_docstring(expand_forms, args, ast, ctx), ast)
-	SN(SH(K"MacroName", _), ) => @match string(macroname.val) begin 
-		"@inline" || "@noinline" || "@inbounds" => expand_forms(args[1], ctx)
-		"@eval" => Literal(:(), ast) # no I'm not proud
-		"@horner" => FunCall(Variable(:evalpoly, ast), PositionalArg.([expand_forms(args[1], ctx), TupleExpr(expand_forms.(args[2:end], (ctx, )), ast)], (ast, )), Vector{Union{KeywordArg, SplatArg}}[], ast)
-		"@generated" => Literal(true, macroname)
-		"@assume_effects" => expand_toplevel(args[2], ctx)
-		_ => handle_error(ctx, macroname, ctx.error_context, "Unrecognized macro $(macroname.val)", () -> MacroExpansion(Literal(:unknown, ast), ast))
-	end
-    _ => MacroExpansion(Literal(:placeholder, ast), ast)
-end
-next_ctx(head, ctx) = ExpandCtx(ctx)
 
-function handle_macrocall(mcro, ast)
-	return Literal(:placeholder, mcro)
-end
+resolve_toplevel_macro(ast, ::DefaultMacroContext, ::Val{Symbol("@doc")}, args, ctx) = MacroExpansionStmt(expand_docstring(expand_toplevel, args, ast, ctx), ast)
+resolve_toplevel_macro(ast, ::DefaultMacroContext, ::Union{Val{Symbol("@inline")}, Val{Symbol("@noinline")}}, args, ctx) = expand_toplevel(args[1], ctx)
+resolve_toplevel_macro(ast, ::DefaultMacroContext, ::Union{Val{Symbol("@assume_effects")}, Val{Symbol("@constprop")}}, args, ctx) = expand_toplevel(args[2], ctx)
+resolve_toplevel_macro(ast, ::DefaultMacroContext, ::Val{mc}, args, ctx) where mc = handle_error(ctx, ast, ctx.error_context, "Unrecognized macro $mc $(typeof(mc))", () -> MacroExpansionStmt(Literal(:unknown, ast), ast))
+
+resolve_macro(ast, ::DefaultMacroContext, ::Val{Symbol("@doc")}, args, ctx) = MacroExpansion(expand_docstring(expand_forms, args, ast, ctx), ast)
+resolve_macro(ast, ::DefaultMacroContext, ::Union{Val{Symbol("@inline")}, Val{Symbol("@noinline")}, Val{Symbol("@inbounds")}}, args, ctx) = expand_forms(args[1], ctx)
+resolve_macro(ast, ::DefaultMacroContext, ::Val{Symbol("@eval")}, args, ctx) = Literal(:(), ast)
+resolve_macro(ast, ::DefaultMacroContext, ::Val{Symbol("@horner")}, args, ctx) = FunCall(Variable(:evalpoly, ast), PositionalArg.([expand_forms(args[1], ctx), TupleExpr(expand_forms.(args[2:end], (ctx, )), ast)], (ast, )), Vector{Union{KeywordArg, SplatArg}}[], ast)
+resolve_macro(ast, ::DefaultMacroContext, ::Val{Symbol("@generated")}, args, ctx) = Literal(true, ast)
+resolve_macro(ast, ::DefaultMacroContext, ::Val{Symbol("@assume_effects")}, args, ctx) = expand_forms(args[2], ctx)
+resolve_macro(ast, ::DefaultMacroContext, ::Val{mc}, args, ctx) where mc = handle_error(ctx, ast, ctx.error_context, "Unrecognized macro $mc", () -> MacroExpansion(Literal(:unknown, ast), ast))
+
+next_ctx(head, ctx) = ExpandCtx(ctx)
 
 expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin 
     SN(SH(K"using", _), [SN(SH(K":", _), [mod, terms...])]) => SourceUsingStmt(expand_import_source(ctx, mod), expand_import_clause.((ctx,), terms; allow_relative=false), ast)
@@ -646,10 +636,10 @@ expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin
     SN(SH(K"struct", _), [mut, sig, fields]) => expand_struct_def(ast, node_to_bool(mut), sig, fields, ctx)
     SN(SH(K"primitive", _), [sig, size]) => expand_primitive_def(ast, sig, size, ctx)
     SN(SH(K"toplevel", _), exprs) => ToplevelStmt(expand_toplevel.(exprs, (ctx, )), ast)
-    SN(SH(K"macrocall", _), [name, args...]) => ctx.toplevel_macro_resolver(ast, name, args, ctx)
+    SN(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), args...]) => resolve_toplevel_macro(ast, ctx.macro_context, Val{Symbol("@doc")}(), args, ctx)
+    SN(SH(K"macrocall", _), [name, args...]) => resolve_toplevel_macro(ast, ctx.macro_context, Val{Symbol(name)}(), args, ctx)
 	expr => ExprStmt(expand_forms(expr, JuliaSyntax.head(expr), JuliaSyntax.children(expr), ExpandCtx(ctx; is_toplevel = true)), ast)
 end
-
 expand_curly_internal(receiver, ctx, args, ast) = 
 	CallCurly(expand_forms(receiver, ctx), [let param = extract_implicit_whereparam(arg, ctx); isnothing(param) ? expand_forms(arg, ctx) : param end for arg in args], ast)
 expand_curly(receiver, ctx, args, ast) = 
@@ -743,7 +733,8 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"comprehension", _), [generator]) => Comprehension(nothing, expand_generator(generator, ctx), ast)
     (SH(K"typed_comprehension", _), [type, generator]) => Comprehension(expand_forms(type, ctx), expand_generator(generator, ctx), ast)
 	(SH(K"Identifier", _), _) => Variable(Expr(ast), ast)
-	(SH(K"macrocall", _), [mcro, args...]) => ctx.macro_resolver(ast, mcro, args, ctx)
+	(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), args...]) => resolve_macro(ast, ctx.macro_context, Val{Symbol(Symbol("@doc"))}(), args, ctx)
+	(SH(K"macrocall", _), [mcro, args...]) => resolve_macro(ast, ctx.macro_context, Val{Symbol(mcro)}(), args, ctx)
     (SH(K"?", _), [cond, then, els]) => Ternary(expand_forms(cond, ctx), expand_forms(then, ctx), expand_forms(els, ctx), ast)
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => handle_error(ctx, ast, ctx.error_context, "must be at top level", () -> Literal(nothing, ast))
 	(SH(op && GuardBy(JuliaSyntax.is_operator), _ && GuardBy(JuliaSyntax.is_dotted)), _) => Broadcast(Variable(Symbol(string(op)), ast), ast)
