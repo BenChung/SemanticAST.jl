@@ -1,27 +1,78 @@
+"The error reporting mode to use"
 abstract type ErrorReporting end
+
+"Create an ASTException when an issue is encountered and continue with the fallback."
 struct ExceptionErrorReporting <: ErrorReporting end
+"Do nothing when an issue is encountered and continue with the fallback."
 struct SilentErrorReporting <: ErrorReporting end
 
+"""
+The abstract type for macro expansion contexts.
+
+There are two macro extension points in the analyzer: `resolve_toplevel_macro(ast::SyntaxNode, ::MacroContext, ::Val{Symbol}, args::Vector{SyntaxNode}, ctx::ExpandCtx)::ToplevelStmts` and `resolve_macro(ast, ::MacroContext, ::Val{Symbol}, args, ctx)::Expression`.
+Both share the same signature:
+
+* `ast`: The SyntaxNode root of the macro invocation.
+* `MacroContext`: The context with which to resolve macros in. Implement a new `MacroContext` by implementing `resolve_toplevel_macro` and `resolve_macro` that accept it; the provided one is `DefaultMacroContext`.
+* `Val{Symbol}`: The macro's name (in `Val` form).
+* `args`: The SyntaxNodes that represent the arguments to the macro.
+* `ctx`: The expansion context inside which the analysis is being done.
+
+They differ in that `resolve_toplevel_macro` returns a `TopLevelStmts` (a statement that can only exist at the top level), while `resolve_macro` returns an `Expression`. An example of how to write a macro analyzer
+can be seen in the default implementation for `@inline` and `@noinline`:
+
+```
+resolve_macro(ast, ::DefaultMacroContext, ::Union{Val{Symbol("@inline")}, Val{Symbol("@noinline")}, Val{Symbol("@inbounds")}}, args, ctx) = expand_forms(args[1], ctx)
+```
+
+From the perspective of the default analyzer `@inline` and `@noinline` are no-ops, so analysis continues by simply calling back into `expand_forms` on the first
+argument.
+
+"""
 abstract type MacroContext end
+
+"""
+The default macro analysis context.
+
+Currently implements top-level support for:
+
+	* @doc
+	* @inline, @noinline
+	* @assume_effects, @constprop
+
+Expression-level support is provided for:
+
+	* @doc
+	* @inline, @noinline
+	* @eval
+	* @generated
+	* @assume_effects
+"""
 struct DefaultMacroContext <: MacroContext end
 
+"""
+	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool= false; macro_context=DefaultMacroContext(), error_context=ExceptionErrorReporting())
 
+The context in which to perform expansion from SyntaxNodes to ASTNodes.
+
+* `is_toplevel`: is the analyzed expression at the top level or not?
+* `is_loop`: is the expression in a loop or not (used for determining if `break` or `continue` are valid)?
+* `macro_context`: The context with which to expand macros. See the discussion in readme.
+* `error_context`: The error reporting context. By default, two are provided ([ExceptionErrorReporting](@ref) and [SilentErrorReporting](@ref)), with exceptions being the default.
+"""
 struct ExpandCtx{ER <: ErrorReporting, MC <: MacroContext}
 	is_toplevel::Bool
 	is_loop::Bool
-	in_module::Bool
 	macro_context::MC
 	error_context::ER
-	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false; in_module=false,
+	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false;
 		 macro_context::MC=DefaultMacroContext(), error_context::ER=ExceptionErrorReporting()) where {ER, MC} =
-		new{ER, MC}(is_toplevel, is_loop, in_module, macro_context, error_context)
+		new{ER, MC}(is_toplevel, is_loop, macro_context, error_context)
 	ExpandCtx(base::ExpandCtx{ER, MC};
 		is_toplevel::Union{Bool, Nothing}=nothing,
-		is_loop::Union{Bool, Nothing}=nothing,
-		in_module::Union{Bool, Nothing}=nothing)  where {ER, MC}= new{ER, MC}(
+		is_loop::Union{Bool, Nothing}=nothing)  where {ER, MC}= new{ER, MC}(
 			isnothing(is_toplevel) ? false : is_toplevel,
 			isnothing(is_loop) ? base.is_loop : is_loop,
-			isnothing(in_module) ? false : in_module,
             base.macro_context, base.error_context)
 end
 
@@ -631,6 +682,21 @@ resolve_macro(ast, ::DefaultMacroContext, ::Val{mc}, args, ctx) where mc = handl
 
 next_ctx(head, ctx) = ExpandCtx(ctx)
 
+"""
+	expand_toplevel(ast::JuliaSyntax.SyntaxNode)::ToplevelStmts
+	expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx)::ToplevelStmts
+
+Takes a SyntaxNode representing an entire file and lowers it to a [ToplevelStmts](@ref).
+
+Toplevel vs. expression can be thought of generally as "where would it make sense for a
+`module` or `using` statement to exist?". As an example, the contents of a file are usually
+at the top level as is the arugment to an `eval` call. In constrast, a method body will not be
+at the top level as neither module nor using statements are valid inside of it.
+
+For most use cases this is the reccomended entry point. Use `expand_forms` if you need to expand
+a specific expression.
+"""
+expand_toplevel(ast::JuliaSyntax.SyntaxNode) = expand_toplevel(ast, ExpandCtx(true, false))
 expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin
     SN(SH(K"using", _), [SN(SH(K":", _), [mod, terms...])]) => SourceUsingStmt(expand_import_source(ctx, mod), expand_import_clause.((ctx,), terms; allow_relative=false), ast)
     SN(SH(K"using", _), [terms...]) => UsingStmt(expand_import_source.((ctx,), terms), ast)
@@ -675,6 +741,12 @@ function expand_try_catch(ctx, block, clauses, ast)
 	TryCatch(expanded_block, catch_var, catch_body, else_body, finally_body, ast)
 end
 
+"""
+	expand_forms(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx)
+
+Expands an expression (such as a method body) from a SyntaxNode to an Expression with respect to a [ExpandCtx](@ref). See [expand_toplevel](@ref) for
+more discussion.
+"""
 expand_forms(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = expand_forms(ast, JuliaSyntax.head(ast), JuliaSyntax.children(ast), next_ctx(JuliaSyntax.head(ast), ctx))
 expand_forms(ast, head, children, ctx) = @match (head, children) begin
 	(SH(K"Float" || K"Integer" || K"String" || K"Char" || K"char" || K"true" || K"false" || K"HexInt", _), _) => Literal(Expr(ast), ast)

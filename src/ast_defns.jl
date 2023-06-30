@@ -1,12 +1,17 @@
-
+"An ASTNode is the parent type of all SemanticAST AST elements. It's used when the object could be literally anything. ASTNodes will have a `.location` field of type SourcePosition, however."
 abstract type ASTNode end
+
+"`Expression`s are non-toplevel ASTNodes (that is, `1+1` is an `Expression` while `using Test` is not)."
 abstract type Expression <: ASTNode end
 
+"Represents the original location and range an AST element came from, currently represented as the originating
+`JuliaSyntax.SyntaxNode` it was analyzed from."
 struct SourcePosition
 	basenode::JuliaSyntax.SyntaxNode
 end
 Base.show(io::IO, pos::SourcePosition) = begin print(io, "SourcePosition") end
 
+#"A type variable with name name, upper bound ub, and lower bound lb"
 @ast_node struct TyVar <: ASTNode
 	name::Union{Symbol, Nothing}
 	ub::Any
@@ -14,7 +19,10 @@ Base.show(io::IO, pos::SourcePosition) = begin print(io, "SourcePosition") end
 end
 export TyVar
 
+"LValues are expressions that can appear on the left-hand-side of an assignment expression. For instance, in the expression `x[foo] = 3` the part `x[foo]` is an lvalue. The language of lvalues is limited beyond the general expression language and they are represented independently by SemanticAST."
 abstract type LValue <: ASTNode end
+
+#"A function argument declaration, consisting of a binding (an LValue or nothing, in case of a wildcard), a default value if provided, and a type ascription if provided."
 @ast_node struct FnArg <: ASTNode
 	binding::Union{LValue, Nothing}
 	default_value::Union{ASTNode, Nothing}
@@ -22,6 +30,7 @@ abstract type LValue <: ASTNode end
 end
 export FnArg, LValue
 
+"A keyword argument declaration. A keyword argument must have a name and may have a type, a default value, may be a vararg"
 struct KwArg <: ASTNode
 	name::Symbol
 	type::Union{ASTNode, Nothing}
@@ -43,8 +52,6 @@ Base.:(|)(a::FieldAttributes, b::FieldAttributes) = FieldAttributes(Int(a) | Int
 	attributes::FieldAttributes
 end
 export StructField, FieldAttributes
-
-Base.:(==)(a::StructField, b::StructField) = a.name == b.name && a.type == b.type && a.attributes == b.attributes
 
 @ast_data CallArg <: ASTNode begin
 	PositionalArg(body::Expression)

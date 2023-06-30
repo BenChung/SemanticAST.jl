@@ -19,6 +19,10 @@ The implementation strategy for SemanticAST is to bring together lowering, parts
 Ideally, SemanticAST will accept any program that is "runnable" by Julia, even if it might encounter a dynamic error. Errors produced by SemanticAST aim to parallel errors produced by Julia
 itself as it goes to compile a given `Expr` to IR, as well as parts of evaluation of that IR.
 
+```@contents
+```
+
+
 # Use
 
 SemanticAST's entry points are through the `expand_forms` and `expand_toplevel` functions; given a
@@ -56,25 +60,6 @@ on top of JuliaSyntax and only understands JuliaSyntax `SyntaxNode`s it cannot p
 macro invocations are simply replaced with a placeholder. There's limited hardcoded support for a small list of built-in macros
 and an extension mechanism, but no more.
 
-There are two macro extension points in the analyzer: `resolve_toplevel_macro(ast::SyntaxNode, ::MacroContext, ::Val{Symbol}, args::Vector{SyntaxNode}, ctx::ExpandCtx)::ToplevelStmts` and `resolve_macro(ast, ::MacroContext, ::Val{Symbol}, args, ctx)::Expression`.
-Both share the same signature:
-
-* `ast`: The SyntaxNode root of the macro invocation.
-* `MacroContext`: The context with which to resolve macros in. Implement a new `MacroContext` by implementing `resolve_toplevel_macro` and `resolve_macro` that accept it; the provided one is `DefaultMacroContext`.
-* `Val{Symbol}`: The macro's name (in `Val` form).
-* `args`: The SyntaxNodes that represent the arguments to the macro.
-* `ctx`: The expansion context inside which the analysis is being done.
-
-They differ in that `resolve_toplevel_macro` returns a `TopLevelStmts` (a statement that can only exist at the top level), while `resolve_macro` returns an `Expression`. An example of how to write a macro analyzer
-can be seen in the default implementation for `@inline` and `@noinline`:
-
-```
-resolve_macro(ast, ::DefaultMacroContext, ::Union{Val{Symbol("@inline")}, Val{Symbol("@noinline")}, Val{Symbol("@inbounds")}}, args, ctx) = expand_forms(args[1], ctx)
-```
-
-From the perspective of the default analyzer `@inline` and `@noinline` are no-ops, so analysis continues by simply calling back into `expand_forms` on the first
-argument.
-
 ## Limitation: Quoting
 
 While SemanticAST will not *choke* on quotes, it won't interpret them intelligently. Quotes are seen as a big blob of `Expr`,
@@ -88,6 +73,3 @@ would be interesting are:
 
 * The ability to analyze normal `Exprs` and not only JuliaSyntax nodes. This could be accomplished by extending the custom patterns to support `Expr`s, and would allow SemanticAST to be used after macro expansion (or as part of normal Julia macro implementations) when combined with
 * Support for semantic forms that don't result from parsing. My goal was to support parser output but macros are allowed to use a larger `Expr` language. As a result, analyzing post-expansion `Expr`s is not possible.
-
-Be warned, this project is currently academic software. It might break, have obvious bugs, and otherwise have weird and unexpected issues. Moreover,
-the `ASTNode` language is not stable: it may change unexpectedly in future releases.
