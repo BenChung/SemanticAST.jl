@@ -8,7 +8,9 @@ JuliaSyntax = "70703baa-626e-46a2-a12c-08ffd08c73b4"
 MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
 
 [compat]
-julia = "1.8"
+julia = "1.8, 1.9"
+JuliaSyntax = "0.4"
+MLStyle = "0.4"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
