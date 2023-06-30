@@ -42,7 +42,7 @@ wex2 = JuliaSyntax.parseall(SN, "x where T where S")
 wex3 = JuliaSyntax.parseall(SN, "x where T <: I")
 wex4 = JuliaSyntax.parseall(SN, "x where T <: I where I")
 wex5 = JuliaSyntax.parseall(SN, "x where {T, V}")
-@testset "flatten_where_expr" begin 
+@testset "flatten_where_expr" begin
 	@test sprint(show, flatten_where_expr(childof(wex1, 1))) == "(x, Any[T])"
 	@test sprint(show, flatten_where_expr(childof(wex2, 1))) == "(x, Any[S, T])"
 	@test sprint(show, flatten_where_expr(childof(wex3, 1))) == "(x, Any[(<: T I)])"
@@ -55,7 +55,7 @@ atv2 = JuliaSyntax.parseall(SN, "A >: B")
 atv3 = JuliaSyntax.parseall(SN, "A <: B <: C")
 atv4 = JuliaSyntax.parseall(SN, "A >: B >: C")
 atv5 = JuliaSyntax.parseall(SN, "A + 2 <: B")
-@testset "analyze_typevar" begin 
+@testset "analyze_typevar" begin
 	@test string(analyze_typevar(childof(atv1, 1), ExpandCtx())) == "TyVar(:A, Variable(:B), nothing)"
 	@test string(analyze_typevar(childof(atv2, 1), ExpandCtx())) == "TyVar(:A, nothing, Variable(:B))"
 	@test string(analyze_typevar(childof(atv3, 1), ExpandCtx())) == "TyVar(:B, Variable(:C), Variable(:A))"
@@ -239,7 +239,7 @@ expr_tests() = [
         "f() = 3" => "Assignment(FunctionAssignment(ResolvedName([:f]), [], [], [], nothing), Literal(3))",
         "f(x) = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing), Variable(:x))",
 		"f(x)::Int = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], Variable(:Int)), Variable(:x))",
-        "f(x::T) where T = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, nothing, nothing)], nothing), Variable(:x))", 
+        "f(x::T) where T = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, nothing, nothing)], nothing), Variable(:x))",
         "f(x::T) where T <: V = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, Variable(:T))], [], [TyVar(:T, Variable(:V), nothing)], nothing), Variable(:x))",
 		"f()::T where T = x" => "Assignment(FunctionAssignment(ResolvedName([:f]), [], [], [TyVar(:T, nothing, nothing)], Variable(:T)), Variable(:x))",
         "x{y} = 2" => "Assignment(UnionAllAssignment(IdentifierAssignment(:x), [TyVar(:y, nothing, nothing)]), Literal(2))",
@@ -364,18 +364,20 @@ expr_tests() = [
 		"x[1 ;; 2 ;; 3]" => "NCat(Variable(:x), 2, [Literal(1), Literal(2), Literal(3)])"
 	],
     :comprehension => [
-        "[x for x in y]" => "Comprehension(nothing, Generator(false, Variable(:x), [IterEq(IdentifierAssignment(:x), Variable(:y))]))",
-        "[x for x in y if z]" => "Comprehension(nothing, Generator(false, Variable(:x), [Filter([IterEq(IdentifierAssignment(:x), Variable(:y))], Variable(:z))]))",
-        "Int[x for x in z, w in l]" =>  "Comprehension(Variable(:Int), Generator(false, Variable(:x), [IterEq(IdentifierAssignment(:x), Variable(:z)), IterEq(IdentifierAssignment(:w), Variable(:l))]))"
+        "[x for x in y]" => "Comprehension(nothing, Generator(Variable(:x), [IterEq(IdentifierAssignment(:x), Variable(:y))]))",
+        "[x for x in y if z]" => "Comprehension(nothing, Generator(Variable(:x), [Filter([IterEq(IdentifierAssignment(:x), Variable(:y))], Variable(:z))]))",
+        "Int[x for x in z, w in l]" =>  "Comprehension(Variable(:Int), Generator(Variable(:x), [Cartesian([IterEq(IdentifierAssignment(:x), Variable(:z)), IterEq(IdentifierAssignment(:w), Variable(:l))])]))"
     ],
 	:generator => [
 		"(return x for x in y)" => ErrorResult(),
-		"(x for a in as)" => "Generator(false, Variable(:x), [IterEq(IdentifierAssignment(:a), Variable(:as))])",
-		"(x for a = as for b = bs if cond1 for c = cs if cond2)" => "Generator(true, Variable(:x), [IterEq(IdentifierAssignment(:a), Variable(:as)), Filter([IterEq(IdentifierAssignment(:b), Variable(:bs))], Variable(:cond1)), Filter([IterEq(IdentifierAssignment(:c), Variable(:cs))], Variable(:cond2))])",
-		"(x for a = as if begin cond2 end)" => "Generator(false, Variable(:x), [Filter([IterEq(IdentifierAssignment(:a), Variable(:as))], Block([Variable(:cond2)]))])",
-		"(a for x in xs if cond)" => "Generator(false, Variable(:a), [Filter([IterEq(IdentifierAssignment(:x), Variable(:xs))], Variable(:cond))])",
-		"(xy for x in xs for y in ys)" => "Generator(true, Variable(:xy), [IterEq(IdentifierAssignment(:x), Variable(:xs)), IterEq(IdentifierAssignment(:y), Variable(:ys))])",
-		"(xy for x in xs for y in ys for z in zs)" => "Generator(true, Variable(:xy), [IterEq(IdentifierAssignment(:x), Variable(:xs)), IterEq(IdentifierAssignment(:y), Variable(:ys)), IterEq(IdentifierAssignment(:z), Variable(:zs))])"
+		"(x for a in as)" => "Generator(Variable(:x), [IterEq(IdentifierAssignment(:a), Variable(:as))])",
+		"(x for a = as for b = bs if cond1 for c = cs if cond2)" => "Generator(Variable(:x), [IterEq(IdentifierAssignment(:a), Variable(:as)), Filter([IterEq(IdentifierAssignment(:b), Variable(:bs))], Variable(:cond1)), Filter([IterEq(IdentifierAssignment(:c), Variable(:cs))], Variable(:cond2))])",
+		"(x for a = as if begin cond2 end)" => "Generator(Variable(:x), [Filter([IterEq(IdentifierAssignment(:a), Variable(:as))], Block([Variable(:cond2)]))])",
+		"(a for x in xs if cond)" => "Generator(Variable(:a), [Filter([IterEq(IdentifierAssignment(:x), Variable(:xs))], Variable(:cond))])",
+		"(xy for x in xs for y in ys)" => "Generator(Variable(:xy), [IterEq(IdentifierAssignment(:x), Variable(:xs)), IterEq(IdentifierAssignment(:y), Variable(:ys))])",
+		"(xy for x in xs, y in ys)" => "Generator(Variable(:xy), [Cartesian([IterEq(IdentifierAssignment(:x), Variable(:xs)), IterEq(IdentifierAssignment(:y), Variable(:ys))])])",
+		"(xy for x in xs for y in ys for z in zs)" => "Generator(Variable(:xy), [IterEq(IdentifierAssignment(:x), Variable(:xs)), IterEq(IdentifierAssignment(:y), Variable(:ys)), IterEq(IdentifierAssignment(:z), Variable(:zs))])",
+		"(x for x in xs, y in ys if w)" => "Generator(Variable(:x), [Filter([Cartesian([IterEq(IdentifierAssignment(:x), Variable(:xs)), IterEq(IdentifierAssignment(:y), Variable(:ys))])], Variable(:w))])",
 	],
 	:struct => [
 		"struct Foo end" => ErrorResult()
@@ -442,7 +444,7 @@ expr_tests() = [
     ]
 ]
 
-toplevel_tests() = [ 
+toplevel_tests() = [
 	:struct => [
 		"struct Foo end" => "StructDefStmt(:Foo, Symbol[], nothing, [], [])",
 		"struct Foo <: Bar end" => "StructDefStmt(:Foo, Symbol[], Variable(:Bar), [], [])",
@@ -598,25 +600,25 @@ toplevel_tests() = [
         \"\"\"
         function f(x)
             x
-        end        
+        end
         """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing, Block([Variable(:x)])))))",
         """
         \"\"\"
         ...
         \"\"\"
-        f(x)    
+        f(x)
         """ => "MacroExpansionStmt(SemanticAST.CallDocstring(StringInterpolate([\"...\\n\"]), ResolvedName([:f]), [FnArg(IdentifierAssignment(:x), nothing, nothing)], [], [], nothing))",
         """
         \"\"\"
         ...
         \"\"\"
-        function f end   
+        function f end
         """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"...\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing))))",
         """
         \"\"\"
         ... \$testme end
         \"\"\"
-        function f end   
+        function f end
         """ => "MacroExpansionStmt(SemanticAST.Docstring(StringInterpolate([\"... \", Variable(:testme), \" end\\n\"]), ExprStmt(FunctionDef(ResolvedName([:f]), [], [], [], nothing, nothing))))",
         """
         \"\"\"
@@ -650,7 +652,7 @@ toplevel_tests() = [
 		@testset "$input" for (input, output) in test_specs
 			if output isa ErrorResult
 				@test_throws ASTException expand_toplevel(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
-			else 
+			else
 				@test string(expand_toplevel(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))) == output
 			end
 		end
@@ -662,7 +664,7 @@ end
 			if output isa ErrorResult
 				@test_throws ASTException expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
 				@test string(expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false; error_context=SemanticAST.SilentErrorReporting()))) != nothing
-			else 
+			else
 				ast = expand_forms(childof(JuliaSyntax.parseall(SN, input), 1), ExpandCtx(true, false))
 				SemanticAST.visit((x) -> nothing, y->nothing, ast)
 				@test string(ast) == output

@@ -2,7 +2,7 @@
 abstract type ASTNode end
 abstract type Expression <: ASTNode end
 
-struct SourcePosition 
+struct SourcePosition
 	basenode::JuliaSyntax.SyntaxNode
 end
 Base.show(io::IO, pos::SourcePosition) = begin print(io, "SourcePosition") end
@@ -37,7 +37,7 @@ export KwArg
 @enum FieldAttributes FIELD_NONE=0 FIELD_CONST=1
 Base.show(io::IO, d::FieldAttributes) = print(io, d)
 Base.:(|)(a::FieldAttributes, b::FieldAttributes) = FieldAttributes(Int(a) | Int(b))
-@ast_node struct StructField <: ASTNode 
+@ast_node struct StructField <: ASTNode
 	name::Symbol
 	type::Union{Expression, Nothing}
 	attributes::FieldAttributes
@@ -46,7 +46,7 @@ export StructField, FieldAttributes
 
 Base.:(==)(a::StructField, b::StructField) = a.name == b.name && a.type == b.type && a.attributes == b.attributes
 
-@ast_data CallArg <: ASTNode begin 
+@ast_data CallArg <: ASTNode begin
 	PositionalArg(body::Expression)
 	KeywordArg(name::Symbol, value::Expression)
 	SplatArg(body::Union{Expression, Nothing})
@@ -78,16 +78,17 @@ export NamedTupleBody, NamedValue, ComputedNamedValue, SplattedNamedValue
 end
 export IfClause
 
-@ast_data Rows <: ASTNode begin 
+@ast_data Rows <: ASTNode begin
 	Splat(body::Expression)
 	Row(elems::Vector{Union{Expression, Splat}})
 	NRow(dim::Int, elems::Vector{Union{NRow, Expression}})
 end
 export Rows, Splat, Row, NRow
 
-@ast_data Iterspec <: ASTNode begin 
+@ast_data Iterspec <: ASTNode begin
 	IterEq(lhs::LValue, rhs::Expression)
 	Filter(inner::Vector{Iterspec}, cond::Expression)
+	Cartesian(dims::Vector{Iterspec})
 end
 export Iterspec, IterEq, Filter
 
@@ -104,7 +105,7 @@ export ImportPath, ImportField, ImportId, ImportRelative
 end
 export DepClause, Dep, AliasDep
 
-@ast_data FunctionName <: ASTNode begin 
+@ast_data FunctionName <: ASTNode begin
 	ResolvedName(path::Vector{Symbol})
 	DeclName(binding::Union{LValue, Nothing}, typ::Expression)
 	TypeFuncName(receiver::Expression, args::Vector{Union{Expression, TyVar}})
@@ -112,7 +113,7 @@ export DepClause, Dep, AliasDep
 end
 export FunctionName, ResolvedName, DeclName, TypeFuncName, AnonFuncName
 
-@ast_data ToplevelStmts <: ASTNode begin 
+@ast_data ToplevelStmts <: ASTNode begin
 	StructDefStmt(name::Symbol, params::Vector{Symbol}, super::Union{Expression, Nothing}, fields::Vector{StructField}, cstrs::Vector{Expression})
 	AbstractDefStmt(name::Symbol, params::Vector{Symbol}, super::Union{Expression, Nothing})
 	PrimitiveDefStmt(name::Symbol, params::Vector{Symbol}, super::Union{Expression, Nothing}, size::Expression)
@@ -163,7 +164,7 @@ export ToplevelStmts, StructDefStmt, AbstractDefStmt, PrimitiveDefStmt, UsingStm
 	HCat(type::Union{Expression, Nothing}, elems::Vector{Union{Expression, Splat}})
 	VCat(type::Union{Expression, Nothing}, rows::Vector{Union{Row, Expression, Splat}})
 	NCat(type::Union{Expression, Nothing}, dim::Int, rows::Vector{Union{NRow, Expression}})
-	Generator(flatten::Bool, expr::Expression, iterators::Vector{Iterspec})
+	Generator(expr::Expression, iterators::Vector{Iterspec})
 	Comprehension(type::Union{Expression, Nothing}, gen::Generator)
 	Quote(ast::JuliaSyntax.SyntaxNode)
     MacroExpansion(value::Any)
@@ -171,7 +172,7 @@ export ToplevelStmts, StructDefStmt, AbstractDefStmt, PrimitiveDefStmt, UsingStm
 end
 export Expression, Literal, Variable, FunctionDef, MacroDef, Block, LetBinding, TryCatch, CallCurly, Comparison, Broadcast, FunCall, GetIndex, GetProperty, Assignment, Update, WhereType, Declaration, DoStatement, TupleExpr, NamedTupleExpr, StringInterpolate, TypeAssert, IfStmt, WhileStmt, BreakStmt, ContinueStmt, ReturnStmt, ForStmt, Vect, HCat, VCat, NCat, Generator, Comprehension, Quote, MacroExpansion, Ternary
 
-@ast_data LValueImpl <: LValue begin 
+@ast_data LValueImpl <: LValue begin
 	IdentifierAssignment(id::Symbol)
 	OuterIdentifierAssignment(id::Symbol)
 	FieldAssignment(obj::Expression, name::Symbol)
@@ -223,7 +224,7 @@ function Base.show(io::IO, (l, r)::Pair{N1, N2}) where {N1 <: ASTNodes, N2 <: AS
 end
 
 @generated function Base.:(==)(a::T, b::T) where T<:Union{Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg}
-	if length(fieldnames(T)) == 0 
+	if length(fieldnames(T)) == 0
 		return true
 	end
 	return :(Base.:(&)($(map(x->:(a.$x == b.$x), filter(x->x != :location, fieldnames(T)))...)))

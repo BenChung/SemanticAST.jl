@@ -13,13 +13,13 @@ struct ExpandCtx{ER <: ErrorReporting, MC <: MacroContext}
 	macro_context::MC
 	error_context::ER
 	ExpandCtx(is_toplevel::Bool=false, is_loop::Bool=false; in_module=false,
-		 macro_context::MC=DefaultMacroContext(), error_context::ER=ExceptionErrorReporting()) where {ER, MC} = 
+		 macro_context::MC=DefaultMacroContext(), error_context::ER=ExceptionErrorReporting()) where {ER, MC} =
 		new{ER, MC}(is_toplevel, is_loop, in_module, macro_context, error_context)
-	ExpandCtx(base::ExpandCtx{ER, MC}; 
-		is_toplevel::Union{Bool, Nothing}=nothing, 
+	ExpandCtx(base::ExpandCtx{ER, MC};
+		is_toplevel::Union{Bool, Nothing}=nothing,
 		is_loop::Union{Bool, Nothing}=nothing,
 		in_module::Union{Bool, Nothing}=nothing)  where {ER, MC}= new{ER, MC}(
-			isnothing(is_toplevel) ? false : is_toplevel, 
+			isnothing(is_toplevel) ? false : is_toplevel,
 			isnothing(is_loop) ? base.is_loop : is_loop,
 			isnothing(in_module) ? false : in_module,
             base.macro_context, base.error_context)
@@ -28,23 +28,23 @@ end
 handle_error(context::ExpandCtx, node::JuliaSyntax.SyntaxNode, reporting::ExceptionErrorReporting, message::String, continuation::Union{Function, Nothing}) = throw(ASTException(node, message))
 handle_error(context::ExpandCtx, node::JuliaSyntax.SyntaxNode, reporting::SilentErrorReporting, message::String, continuation::Union{Function, Nothing}) = if !isnothing(continuation) continuation() else nothing end
 
-isdecl(ast) = @match ast begin 
+isdecl(ast) = @match ast begin
 	SN(SH(K"::", _), _) => true
 	_ => false
 end
-isassignment(ast) = @match ast begin 
+isassignment(ast) = @match ast begin
 	SN(SH(K"=", _), _) => true
 	_ => false
 end
-iskwarg(ast) = @match ast begin 
+iskwarg(ast) = @match ast begin
 	SN(SH(K"=", _), _) => true
 	_ => false
 end
-identifier_name(ast) = @match ast begin 
+identifier_name(ast) = @match ast begin
 	SN(SH(K"Identifier", _), _) => ast
 	_ => nothing
 end
-eventually_call = @λ begin 
+eventually_call = @λ begin
 	SN(SH(K"call", _), _) => true
 	SN(SH(K"where", _), [name, _...]) => eventually_call(name)
 	SN(SH(K"::", _), [name, _]) => eventually_call(name)
@@ -52,11 +52,11 @@ eventually_call = @λ begin
 end
 
 isdotop_named(ast) = let idname = identifier_name(ast); !isnothing(idname) && JuliaSyntax.is_dotted(JuliaSyntax.head(idname)) end
-check_dotop(ctx, ast) = 
-	if isdotop_named(ast) 
+check_dotop(ctx, ast) =
+	if isdotop_named(ast)
 		handle_error(ctx, ast, ctx.error_context, "Invalid function name", nothing)
-	else 
-		@match ast begin 
+	else
+		@match ast begin
 			SN(SH(K".", _), [rec, name]) => check_dotop(ctx, name)
 			SN(SH(K"quote" || K"break", _), [body]) => check_dotop(ctx, body)
 			_ => nothing
@@ -71,13 +71,17 @@ just_argslist(args) = kindof(args[1]) ∈ KSet"tuple block ..." || (kindof(args[
 
 function flatten_where_expr(ex)
 	vars = Any[]
-	if kindof(ex) != K"where" 
+	if kindof(ex) != K"where"
 		throw(ASTException(ex, "Invalid expression (internal error: flattening non-where)")) # using direct throw due to fatal error
 	end
 	while kindof(ex) == K"where"
-		@match ex begin 
-			SN(SH(K"where", _), [body, current_vars...]) => begin 
+		@match ex begin
+			SN(SH(K"where", _), [body, SN(SH(K"braces", _), [current_vars...])]) => begin
 				push!.((vars, ), current_vars)
+				ex = body
+			end
+			SN(SH(K"where", _), [body, var]) => begin
+				push!(vars, var)
 				ex = body
 			end
 			_ => ex
@@ -88,7 +92,7 @@ end
 
 function analyze_typevar(ex, ctx)
 	check_sym(s) = (kindof(s) == K"Identifier" ? Expr(s) : handle_error(ctx, s, ctx.error_context, "Invalid type variable (non-symbol)", () -> TyVar(gensym(), nothing, nothing, ex)))
-	@match ex begin 
+	@match ex begin
 		ex && GuardBy(isatom) => TyVar(check_sym(ex), nothing, nothing, ex)
 		SN(SH(K"Identifier", _), _) => TyVar(check_sym(ex), nothing, nothing, ex)
 		SN(SH(K"comparison", _), [a, SN(SH(K"<:", _), _), b, SN(SH(K"<:", _), _), c]) => TyVar(check_sym(b), expand_forms(c, ctx), expand_forms(a, ctx), ex)
@@ -98,32 +102,32 @@ function analyze_typevar(ex, ctx)
 	end
 end
 
-analyze_tuple_assignment(expr, ctx) = @match expr begin 
+analyze_tuple_assignment(expr, ctx) = @match expr begin
 	SN(SH(K"Identifier", _), _) && name => IdentifierAssignment(Expr(name), expr)
 	SN(SH(K"::", _), [name, type]) => TypedAssignment(IdentifierAssignment(Expr(name)), expand_forms(type, ctx), expr)
 	_ => handle_error(ctx, expr, ctx.error_context, "invalid assignment location", () -> IdentifierAssignment(gensym(), expr))
 end
 
-unquote = @λ begin 
+unquote = @λ begin
 	SN(SH(K"quote", _), [body]) => Expr(body)
 end
-analyze_lvalue(expr, ctx; is_for=false) = @match expr begin 
-	SN(SH(K"Identifier", _), _) && id => 
+analyze_lvalue(expr, ctx; is_for=false) = @match expr begin
+	SN(SH(K"Identifier", _), _) && id =>
 		if Expr(id) ∈ [:ccall, :global]
 			handle_error(ctx, expr, ctx.error_context, "invalid assignment location", () -> IdentifierAssignment(gensym(), expr))
-		else 
+		else
 			IdentifierAssignment(Expr(id), expr)
 		end
 	SN(SH(K".", _), [a,b]) => FieldAssignment(expand_forms(a, ctx), unquote(b), expr)
 	SN(SH(K"tuple", _), [_, args..., SN(SH(K"parameters", _), _)]) => handle_error(ctx, expr, ctx.error_context, "invalid assignment location", () -> IdentifierAssignment(gensym(), expr))
-	SN(SH(K"tuple", _), [SN(SH(K"parameters", _), params)]) => 
+	SN(SH(K"tuple", _), [SN(SH(K"parameters", _), params)]) =>
 		NamedTupleAssignment(map(x -> analyze_tuple_assignment(x, ctx), params), expr)
 	SN(SH(K"tuple", _), [args...]) => begin
 			has_varargs = false
 			assignment_args = LValue[]
-			for arg in args 
-				@match arg begin 
-					SN(SH(K"...", _), body) => begin 
+			for arg in args
+				@match arg begin
+					SN(SH(K"...", _), body) => begin
 						if has_varargs
 							push!(assignment_args, handle_error(ctx, arg, ctx.error_context, "multiple \"...\" on lhs of assignment", () -> IdentifierAssignment(gensym(), expr)))
 						end
@@ -144,43 +148,43 @@ analyze_lvalue(expr, ctx; is_for=false) = @match expr begin
 	SN(SH(K"vcat" || K"ncat", _), _) => handle_error(ctx, expr, ctx.error_context, "use \"(a, b) = ...\" to assign multiple values", () -> IdentifierAssignment(gensym(), expr))
 	SN(SH(K"call" || K"where", _), _) && name => FunctionAssignment(expand_function_name(name, ctx)..., expr)
     SN(SH(K"curly", _), [name, tyargs...]) => length(tyargs) == 0 ? handle_error(ctx, expr, ctx.error_context, "empty type parameter list", () -> analyze_lvalue(name, ctx)) : UnionAllAssignment(analyze_lvalue(name, ctx), analyze_typevar.(tyargs, (ctx, )), expr)
-	SN(SH(K"outer", _), [SN(SH(K"Identifier", _), _) && id]) =>  
-		if is_for 
-			OuterIdentifierAssignment(Expr(id), expr) 
-		else 
+	SN(SH(K"outer", _), [SN(SH(K"Identifier", _), _) && id]) =>
+		if is_for
+			OuterIdentifierAssignment(Expr(id), expr)
+		else
 			handle_error(ctx, expr, ctx.error_context, "no outer local variable declaration exists", () -> IdentifierAssignment(Expr(id), expr))
 		end
 	_ => handle_error(ctx, expr, ctx.error_context, "invalid assignment location", () -> IdentifierAssignment(gensym(), expr))
 end
 
 expr_contains_p(pred, expr, filter = x -> true) =
-	filter(expr) && (pred(expr) || @match expr begin 
+	filter(expr) && (pred(expr) || @match expr begin
 		SN(SH(K"quote", _), _) => false
 		SN(_, args) => any(expr_contains_p.(pred, args, filter))
 		e => throw("unhandled $e")
 	end)
 
 isparam = @λ begin SN(SH(K"parameters", _), _) => true; _ => false end
-contains_destructuring = @λ begin 
+contains_destructuring = @λ begin
 	SN(SH(K"::" || K"=", _), _) => true
-	_ => false 
+	_ => false
 end
-is_return = @λ begin 
+is_return = @λ begin
 	SN(SH(K"return", _), _) => true
-	_ => false 
+	_ => false
 end
 contains_return(e) = expr_contains_p(is_return, e)
-check_recursive_assignment(expr) = 
+check_recursive_assignment(expr) =
 	if expr_contains_p(contains_destructuring, expr)
 		false
-	else 
+	else
 		true
 	end
 analyze_argument(expr, is_kw, ctx) = @match (expr, is_kw) begin
 	(SN(SH(K"tuple", _), _), false) => (FnArg(analyze_lvalue(expr, ctx), nothing, nothing, expr), false)
-	(SN(SH(K"::", _), [binding, typ]), false) => check_recursive_assignment(binding) ? 
-		(FnArg(analyze_lvalue(binding, ctx), nothing, expand_forms(typ, ctx), expr), false) : 
-		(handle_error(ctx, expr, ctx.error_context, "invalid recursive destructuring syntax", () -> FnArg(IdentifierAssignment(gensym(), expr), nothing, expand_forms(typ, ctx), expr)), false) 
+	(SN(SH(K"::", _), [binding, typ]), false) => check_recursive_assignment(binding) ?
+		(FnArg(analyze_lvalue(binding, ctx), nothing, expand_forms(typ, ctx), expr), false) :
+		(handle_error(ctx, expr, ctx.error_context, "invalid recursive destructuring syntax", () -> FnArg(IdentifierAssignment(gensym(), expr), nothing, expand_forms(typ, ctx), expr)), false)
 	(SN(SH(K"::", _), [typ]), false) => (FnArg(nothing, nothing, expand_forms(typ, ctx), expr), false)
 	(SN(SH(K"=", _), [head, default]), is_kw) => (let (base, _) = analyze_argument(head, false, ctx); FnArg(base.binding, expand_forms(default, ctx), base.type, expr) end, true)
 	(SN(SH(K"...", _), [bound]), false) => (FnArg(VarargAssignment(analyze_lvalue(bound, ctx), expr), nothing, nothing, expr), false)
@@ -189,7 +193,7 @@ analyze_argument(expr, is_kw, ctx) = @match (expr, is_kw) begin
 	(_, true) => (handle_error(ctx, expr, ctx.error_context, "optional positional arguments must occur at end", () -> first(analyze_argument(expr, false, ctx))), true)
 	(_, _) => (handle_error(ctx, expr, ctx.error_context, "invalid argument syntax", () -> FnArg(IdentifierAssignment(gensym(), expr), nothing, nothing, expr)), is_kw)
 end
-analyze_kwargs(expr, ctx) = @match expr begin 
+analyze_kwargs(expr, ctx) = @match expr begin
 	SN(SH(K"parameters", _), _) => handle_error(ctx, expr, ctx.error_context, "more than one semicolon in argument list", () -> KwArg(gensym(), nothing, nothing, expr))
 	SN(SH(K"=", _), [SN(SH(K"::", _), [SN(SH(K"Identifier", _), ) && name, type]), body]) => begin
 		KwArg(Expr(name), expand_forms(type, ctx), expand_forms(body, ctx), expr)
@@ -206,22 +210,23 @@ end
 
 hasduplicates(array) = length(unique(array)) != length(array)
 
-unpack_fn_name = @λ begin 
-SN(SH(K".", _), [rec, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) => push!(unpack_fn_name(rec), Expr(field))
-SN(SH(K"Identifier", _), _) && name => [Expr(name)]
+unpack_fn_name(e, ctx) = @match e begin
+	SN(SH(K".", _), [rec, SN(SH(K"quote", _), [field && SN(SH(K"Identifier", _), _)])]) => push!(unpack_fn_name(rec, ctx), Expr(field))
+	SN(SH(K"Identifier", _), _) && name => [Expr(name)]
+	expr => handle_error(ctx, expr, ctx.error_context, "invalid function name", () -> [gensym()])
 end
 
 parse_func_name(ctx, receiver, args, e) = TypeFuncName(expand_forms(receiver, ctx), [let param = extract_implicit_whereparam(arg, ctx); isnothing(param) ? expand_forms(arg, ctx) : param end for arg in args], e)
-resolve_function_name(e, ctx) = @match e begin 
+resolve_function_name(e, ctx) = @match e begin
 	SN(SH(K"Identifier", _), _) && name => ResolvedName([Expr(name)], e) # symbols are valid
-	SN(SH(K".", _), _) && e => ResolvedName(unpack_fn_name(e), e)
+	SN(SH(K".", _), _) && e => ResolvedName(unpack_fn_name(e, ctx), e)
 	SN(SH(K"::", _), [name, type]) => DeclName(analyze_lvalue(name, ctx), expand_forms(type, ctx), e)
 	SN(SH(K"::", _), [type]) => DeclName(nothing, expand_forms(type, ctx), e)
     SN(SH(K"curly", _), [receiver, args..., SN(SH(K"parameters", _), _)]) => handle_error(ctx, e, ctx.error_context, "unexpected semicolon", () -> parse_func_name(ctx, receiver, args, e))
     SN(SH(K"curly", _), [receiver, args...]) =>
-		if any(iskwarg, args) 
+		if any(iskwarg, args)
 			handle_error(ctx, e, ctx.error_context, "unexpected semicolon", () -> parse_func_name(ctx, receiver, filter(a -> !iskwarg(a), args), e))
-		else 
+		else
 			parse_func_name(ctx, receiver, args, e)
 		end
     SN(GuardBy(JuliaSyntax.is_operator) && GuardBy((!) ∘ JuliaSyntax.is_dotted), _) && name => ResolvedName([Expr(name)], e) # so are non-dotted operators
@@ -234,15 +239,15 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 	# todo: nospecialize
 	is_kw = false
 	args_stmts = [
-		begin 
+		begin
 			(result, is_kw) = analyze_argument(expr, is_kw, ctx)
-			result 
+			result
 		end for expr in filter((!) ∘ isparam, args)]
 	params = filter(isparam, args)
 	kwargs_stmts = []
 	if length(params) == 1
-		kwargs_stmts = @match params[1] begin 
-			SN(SH(K"parameters", _), [params...]) => 
+		kwargs_stmts = @match params[1] begin
+			SN(SH(K"parameters", _), [params...]) =>
 				if !is_macro
 					map(x -> analyze_kwargs(x, ctx), params)
 				else
@@ -265,7 +270,7 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 	if !isempty(varargs_indices) && last(varargs_indices) != length(args_stmts)
 		handle_error(ctx, call, ctx.error_context, "invalid \"...\" on non-final argument", nothing)
 	end
-	get_fnarg_name = @λ begin 
+	get_fnarg_name = @λ begin
 		FnArg(IdentifierAssignment(name, _) || TypedAssignment(IdentifierAssignment(name, _), _, _,), _, _, _) => [name]
 		expr => begin [] end
 	end
@@ -282,8 +287,8 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 end
 
 function destructure_function_head(name)
-	(name, raw_typevars) = @match name begin 
-		SN(SH(K"::", _), [nexpr, SN(SH(K"where", _), _) && clause]) => begin 
+	(name, raw_typevars) = @match name begin
+		SN(SH(K"::", _), [nexpr, SN(SH(K"where", _), _) && clause]) => begin
 			return (nexpr, flatten_where_expr(clause)...)
 		end
 		SN(SH(K"where", _), _) => flatten_where_expr(name)
@@ -315,7 +320,7 @@ function expand_anon_function(spec, ctx)
 		_ => (handle_error(ctx, orig_expr, ctx.error_context, "invalid assignment location name $name", () -> ResolvedName([gensym()], orig_expr)), [], KwArg[], TyVar[], nothing)
 	end
 end
-function analyze_let_eq(expr) 
+function analyze_let_eq(expr)
 	return @match expr begin
 		FunctionAssignment(ResolvedName([_], _), _, _, _, _, _) && fun => fun
 		FunctionAssignment(name, a, b, c, d, e) && fun => handle_error(ctx, name.location.basenode, ctx.error_context, "invalid let syntax", () -> FunctionAssignment(ResolvedName(gensym, name.location.basenode), a, b, c, d, e))
@@ -325,23 +330,23 @@ function analyze_let_eq(expr)
 		_ => handle_error(ctx, expr.location.basenode, ctx.error_context, "invalid let syntax", () -> IdentifierAssignment(gensym(), expr.location.basenode))
 	end
 end
-analyze_let_binding(expr, ctx) = @match expr begin 
+analyze_let_binding(expr, ctx) = @match expr begin
 	SN(SH(K"Identifier", _), _) && ident => Expr(ident)
 	SN(SH(K"=", _), [a, b]) => (analyze_let_eq(analyze_lvalue(a, ctx))) => expand_forms(b, ctx)
 	_ => begin handle_error(ctx, expr, ctx.error_context, "invalid let syntax", nothing); nothing end
 end
 function expand_macro_name(name, ctx)
 	name, args_stmts, kwargs_stmts, sparams, rett = expand_function_name(name, ctx; is_macro = true)
-	return name, args_stmts, sparams, rett 
+	return name, args_stmts, sparams, rett
 end
 
-eventually_decl(expr) = @match expr begin 
+eventually_decl(expr) = @match expr begin
 	SN(SH(K"Identifier", _), _) => true
 	SN(SH(K"::" || K"const" || K"=", _), [name, _...]) => eventually_decl(name)
 	_ => false
 end
 
-analyze_type_sig = @λ begin 
+analyze_type_sig = @λ begin
 	SN(SH(K"Identifier", _), _) && name => (name, [], nothing)
 	SN(SH(K"curly", _), [SN(SH(K"Identifier", _), _) && name, params...]) => (name, params, nothing)
 	SN(SH(K"<:", _), [SN(SH(K"Identifier", _), _) && name, super]) => (name, [], super)
@@ -349,13 +354,13 @@ analyze_type_sig = @λ begin
 	_ && invalid => nothing
 end
 
-node_to_bool = @λ begin 
+node_to_bool = @λ begin
 	SN(SH(K"true",_), _) => true
 	SN(SH(K"false",_), _) => false
 	expr => throw(ASTException(expr, "boolean used in non-boolean context")) # left due to being a fatal internal error
 end
 
-unpack_attrs(expr, attrs, mutable, ctx) = @match (expr, mutable) begin 
+unpack_attrs(expr, attrs, mutable, ctx) = @match (expr, mutable) begin
 	(SN(SH(K"=", _), [lhs && GuardBy(eventually_decl), value]), _) => handle_error(ctx, expr, ctx.error_context, "operator = inside type definition is reserved", () -> StructField(gensym(), nothing, [], expr))
 	(SN(SH(K"::", _), [SN(SH(K"Identifier", _), _) && name, typ]), _) => StructField(Expr(name), expand_forms(typ, ctx), attrs, expr)
 	(SN(SH(K"Identifier", _), _) && name, _) => StructField(Expr(name), nothing, attrs, expr)
@@ -363,27 +368,27 @@ unpack_attrs(expr, attrs, mutable, ctx) = @match (expr, mutable) begin
 	(SN(SH(K"const", _), [ex]), false) => handle_error(ctx, expr, ctx.error_context, "invalid field attribute const for immutable struct", nothing)
 	_ => throw("invalid field attribute")
 end
-quoted = @λ begin 
+quoted = @λ begin
 	SN(SH(K"quote", _), _) => true
 	_ => false
 end
-effect_free = @λ begin 
+effect_free = @λ begin
 	SN(SH(K"true" || K"false", _), _) => true
 	SN(SH(K".", _), [SH(SN(K"Identifier", _), _), _]) => true # sym-dot?
 	GuardBy(quoted) => true
 	_ => false
 end
-is_string = @λ begin 
+is_string = @λ begin
 	SN(SH(K"string" || K"String", _), _) => true
 	_ => false
 end
 
 unzip(a) = map(x->getfield.(a, x), fieldnames(eltype(a)))
-decompose_decl(e) = @match e begin 
+decompose_decl(e) = @match e begin
 	SN(SH(K"::", _), [name, typ]) => (name, typ)
 	ex => (ex, nothing)
 end
-flatten_blocks(e) = @match e begin 
+flatten_blocks(e) = @match e begin
 	SN(SH(K"block", _), [contents...]) => vcat((flatten_blocks.(contents))...)
 	expr => [expr]
 end
@@ -432,7 +437,7 @@ function expand_primitive_def(expr, sig, size, ctx)
 	return PrimitiveDefStmt(Expr(name), params, isnothing(super) ? nothing : expand_forms(super, ctx), expand_forms(size, ctx), expr)
 end
 
-extract_implicit_whereparam(expr, ctx) = @match expr begin 
+extract_implicit_whereparam(expr, ctx) = @match expr begin
 	SN(SH(K"<:", _), [bound]) => TyVar(nothing, expand_forms(bound, ctx), nothing, expr)
 	SN(SH(K">:", _), [bound]) => TyVar(nothing, nothing, expand_forms(bound, ctx), expr)
 	_ => nothing
@@ -441,12 +446,12 @@ isatom(ast) = @match ast begin
     SH(K"Float" || K"Integer" || K"String" || K"Char" || K"true" || K"false", _) => true
     _ => false
 end
-ifnotfalse(ast, then) = @match ast begin 
+ifnotfalse(ast, then) = @match ast begin
 	SN(SH(K"false",_ ), _) => nothing
 	_ => then(ast)
 end
 
-analyze_kw_param(expr, ctx) = @match expr begin 
+analyze_kw_param(expr, ctx) = @match expr begin
 	SN(SH(K"parameters", _), [params...]) => handle_error(ctx, expr, ctx.error_context, "more than one semicolon in argument list", () -> KeywordArg(gensym(), nothing, expr))
 	SN(SH(K"=", _), [name && SN(SH(K"Identifier", _), _), value]) => KeywordArg(Expr(name), expand_forms(value, ctx), expr)
 	SN(SH(K"Identifier", _), _) && name => KeywordArg(Expr(name), expand_forms(name, ctx), expr)
@@ -458,13 +463,13 @@ analyze_kw_call(params, ctx) = map(x -> analyze_kw_param(x, ctx), params)
 function split_arguments(args, ctx; down=expand_forms)
 	pos_args = []; kw_args = []
     has_parameters = false
-	for arg in args 
-		@match arg begin 
-			SN(SH(K"parameters", _), [params...]) => 
-                if !has_parameters 
+	for arg in args
+		@match arg begin
+			SN(SH(K"parameters", _), [params...]) =>
+                if !has_parameters
                     append!(kw_args, analyze_kw_call(params, ctx))
                     has_parameters = true
-                else 
+                else
 					handle_error(ctx, arg, ctx.error_context, "more than one semicolon in argument list", nothing)
                 end
 			SN(SH(K"=", _), [SN(SH(K"Identifier", _), _) && name, value]) => push!(kw_args, KeywordArg(Expr(name), down(value, ctx), arg))
@@ -476,7 +481,7 @@ function split_arguments(args, ctx; down=expand_forms)
 end
 function split_op_arguments(args, ctx; down=expand_forms)
 	pos_args = []; kw_args = []
-	for arg in args 
+	for arg in args
 		push!(pos_args, PositionalArg(down(arg, ctx), arg))
 	end
 	return pos_args, kw_args
@@ -484,22 +489,22 @@ end
 
 expand_broadcast(e) = dot_to_fuse(e)
 
-convert_decltype = @λ begin 
+convert_decltype = @λ begin
 	K"const" => DECL_CONST
 	K"local" => DECL_LOCAL
 	K"global" => DECL_GLOBAL
 end
 expand_declaration(decltype, expr, ctx) = @match expr begin
-	SN(SH(K"Identifier", _), _) => 
-		if decltype != DECL_CONST 
+	SN(SH(K"Identifier", _), _) =>
+		if decltype != DECL_CONST
 			VarDecl(IdentifierAssignment(Expr(expr), expr), nothing, decltype, expr)
-		else 
+		else
 			handle_error(ctx, expr, ctx.error_context, "expected assignment after \"const\"", () -> VarDecl(IdentifierAssignment(Expr(expr), expr), nothing, DECL_NONE, expr))
 		end
 	SN(SH(K"::", _), _) => VarDecl(analyze_lvalue(expr, ctx), nothing, decltype, expr)
 	SN(SH(GuardBy(JuliaSyntax.is_prec_assignment), _), [lhs, rhs]) => VarDecl(analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), decltype, expr)
 end
-expand_named_tuple_arg(expr, ctx) = @match expr begin 
+expand_named_tuple_arg(expr, ctx) = @match expr begin
 	SN(SH(K"=", _), [SN(SH(K"Identifier", _), _) && name, rhs]) => NamedValue(Expr(name), expand_forms(rhs, ctx), expr)
 	SN(SH(K"=", _), [lhs, rhs]) => handle_error(ctx, expr, ctx.error_context, "invalid name", () -> NamedValue(gensym(), expand_forms(rhs, ctx), expr))
 	SN(SH(K"Identifier", _), _) && name => NamedValue(Expr(name), expand_forms(name, ctx), expr)
@@ -508,7 +513,7 @@ expand_named_tuple_arg(expr, ctx) = @match expr begin
     SN(SH(K"...", _), [splat]) => SplattedNamedValue(expand_forms(splat, ctx), expr)
 	expr => begin handle_error(ctx, expr, ctx.error_context, "invalid named tuple argument", nothing); nothing end
 end
-function expand_named_tuple(args, ctx) 
+function expand_named_tuple(args, ctx)
 	tupleargs = []
 	for arg in args
 		expanded = expand_named_tuple_arg(arg, ctx)
@@ -519,12 +524,12 @@ function expand_named_tuple(args, ctx)
 	return tupleargs
 end
 
-string_interpoland(expr, ctx) = @match expr begin 
+string_interpoland(expr, ctx) = @match expr begin
 	SN(SH(K"String", _), _) && str => Expr(str)
 	other => expand_forms(other, ctx)
 end
 
-expand_if_clause(expr, clauses, ctx) = @match clauses begin 
+expand_if_clause(expr, clauses, ctx) = @match clauses begin
 	[cond, then, SN(SH(K"elseif", _), elsif)] => pushfirst!(expand_if_clause(expr, elsif, ctx), IfClause(expand_forms(cond, ctx), expand_forms(then, ctx), expr))
 	[cond, then, els] => [IfClause(expand_forms(cond, ctx), expand_forms(then, ctx), expr), IfClause(nothing, expand_forms(els, ctx), expr)]
 	[cond, then] => [IfClause(expand_forms(cond, ctx), expand_forms(then, ctx), expr)]
@@ -537,7 +542,7 @@ end
 
 is_update(kw) = kw ∈ KSet"+= -= *= /= //= \= ^= ÷= |= &= ⊻= <<= >>= >>>="
 
-expand_hcat_arg(expr, ctx) = @match expr begin 
+expand_hcat_arg(expr, ctx) = @match expr begin
 	GuardBy(isassignment) => begin handle_error(ctx, expr, ctx.error_context, "misplaced assignment statement", nothing); nothing end
 	GuardBy(isparam) => begin handle_error(ctx, expr, ctx.error_context, "unexpected semicolon in array expression", nothing); nothing end
 	SN(SH(K"...", _), [body]) => Splat(expand_forms(body, ctx), expr)
@@ -562,25 +567,26 @@ expand_nrow(expr, ctx) = @match expr begin
 	e => expand_forms(e, ctx)
 end
 
-expand_iterator(expr, ctx)::Iterspec = @match expr begin 
+expand_iterator(expr, ctx)::Iterspec = @match expr begin
+	SN(SH(K"cartesian_iterator", _), iters) => Cartesian(expand_iterator.(iters, (ctx, )), expr)
 	SN(SH(K"=", _), [lhs, rhs]) => IterEq(analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), expr)
 	SN(SH(K"filter", _), [iters..., cond]) => Filter(expand_iterator.(iters, (ctx,)), expand_forms(cond, ctx), expr)
 end
-expand_generator(expr, ctx)::Expression = @match expr begin 
-	SN(SH((K"generator" || K"flatten") && head, _), [expr, iters...]) => Generator(head == K"flatten", expand_forms(expr, ctx), Iterspec[expand_iterator(iter, ctx) for iter in iters], expr)
+expand_generator(expr, ctx)::Expression = @match expr begin
+	SN(SH(K"generator", _), [expr, iters...]) => Generator(expand_forms(expr, ctx), Iterspec[expand_iterator(iter, ctx) for iter in iters], expr)
 end
 
-expand_import_source(ctx, expr) = @match expr begin 
-	SN(SH(K".", _), path) => expand_import_path(ctx,path)
+expand_import_source(ctx, expr) = @match expr begin
+	SN(SH(K"importpath", _), path) => expand_import_path(ctx,path)
 end
-expand_import_clause(ctx, expr; allow_relative=true) = @match expr begin 
-	SN(SH(K".", _), path) => Dep(expand_import_path(ctx, path; allow_relative=allow_relative), expr)
-	SN(SH(K"as", _), [SN(SH(K".", _), path), SN(SH(K"Identifier", _), _) && alias]) => AliasDep(expand_import_path(ctx, path; allow_relative=allow_relative), Expr(alias), expr)
+expand_import_clause(ctx, expr; allow_relative=true) = @match expr begin
+	SN(SH(K"importpath", _), path) => Dep(expand_import_path(ctx, path; allow_relative=allow_relative), expr)
+	SN(SH(K"as", _), [SN(SH(K"importpath", _), path), SN(SH(K"Identifier", _), _) && alias]) => AliasDep(expand_import_path(ctx, path; allow_relative=allow_relative), Expr(alias), expr)
 end
 
 function expand_import_path(ctx, src_path; allow_relative=true)
 	path = nothing
-	for path_el in src_path 
+	for path_el in src_path
 		path = @match (path_el, path) begin
 			(SN(SH(K"Identifier" || K"MacroName", _), _) && id, nothing) => ImportId(Expr(id), path_el)
 			(SN(SH(K"Identifier" || K"MacroName", _), _) && id, path) => ImportField(path, Expr(id), path_el)
@@ -593,7 +599,7 @@ function expand_import_path(ctx, src_path; allow_relative=true)
 	return path
 end
 
-expand_tuple_arg(expr, ctx) = @match expr begin 
+expand_tuple_arg(expr, ctx) = @match expr begin
     SN(SH(K"...", _), [ex]) => Splat(expand_forms(ex, ctx), expr)
     _ => expand_forms(expr, ctx)
 end
@@ -625,31 +631,49 @@ resolve_macro(ast, ::DefaultMacroContext, ::Val{mc}, args, ctx) where mc = handl
 
 next_ctx(head, ctx) = ExpandCtx(ctx)
 
-expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin 
+expand_toplevel(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = @match ast begin
     SN(SH(K"using", _), [SN(SH(K":", _), [mod, terms...])]) => SourceUsingStmt(expand_import_source(ctx, mod), expand_import_clause.((ctx,), terms; allow_relative=false), ast)
     SN(SH(K"using", _), [terms...]) => UsingStmt(expand_import_source.((ctx,), terms), ast)
     SN(SH(K"import", _), [SN(SH(K":", _), [mod, terms...])]) => SourceImportStmt(expand_import_source(ctx, mod), expand_import_clause.((ctx,), terms; allow_relative=false), ast)
     SN(SH(K"import", _), [terms...]) => ImportStmt(expand_import_clause.((ctx,), terms), ast)
     SN(SH(K"export", _), syms) => ExportStmt(Expr.(syms), ast)
-    SN(SH(K"module", _), [stdimports, name, SN(SH(K"block", _), stmts)]) => ModuleStmt(Expr(stdimports), Expr(name), expand_toplevel.(stmts, (ctx, )), ast)
+    SN(SH(K"module", flags), [name, SN(SH(K"block", _), stmts)]) => ModuleStmt(!JuliaSyntax.has_flags(flags, JuliaSyntax.BARE_MODULE_FLAG), Expr(name), expand_toplevel.(stmts, (ctx, )), ast)
     SN(SH(K"abstract", _), [sig]) => expand_abstract_def(ast, sig, ctx)
-    SN(SH(K"struct", _), [mut, sig, fields]) => expand_struct_def(ast, node_to_bool(mut), sig, fields, ctx)
+    SN(SH(K"struct", flags), [sig, fields]) => expand_struct_def(ast, JuliaSyntax.has_flags(flags, JuliaSyntax.MUTABLE_FLAG), sig, fields, ctx)
     SN(SH(K"primitive", _), [sig, size]) => expand_primitive_def(ast, sig, size, ctx)
     SN(SH(K"toplevel", _), exprs) => ToplevelStmt(expand_toplevel.(exprs, (ctx, )), ast)
-    SN(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), args...]) => resolve_toplevel_macro(ast, ctx.macro_context, Val{Symbol("@doc")}(), args, ctx)
+    SN(SH(K"doc", _), [args...]) => resolve_toplevel_macro(ast, ctx.macro_context, Val{Symbol("@doc")}(), args, ctx)
     SN(SH(K"macrocall", _), [name, args...]) => resolve_toplevel_macro(ast, ctx.macro_context, Val{Symbol(name)}(), args, ctx)
 	expr => ExprStmt(expand_forms(expr, JuliaSyntax.head(expr), JuliaSyntax.children(expr), ExpandCtx(ctx; is_toplevel = true)), ast)
 end
-expand_curly_internal(receiver, ctx, args, ast) = 
+expand_curly_internal(receiver, ctx, args, ast) =
 	CallCurly(expand_forms(receiver, ctx), [let param = extract_implicit_whereparam(arg, ctx); isnothing(param) ? expand_forms(arg, ctx) : param end for arg in args], ast)
-expand_curly(receiver, ctx, args, ast) = 
-	any(iskwarg, args) ? 
-		handle_error(ctx, ast, ctx.error_context, "misplaced assignment statement", () -> expand_curly_internal(receiver, ctx, filter((!) ∘ isnothing, args), ast)) : 
+expand_curly(receiver, ctx, args, ast) =
+	any(iskwarg, args) ?
+		handle_error(ctx, ast, ctx.error_context, "misplaced assignment statement", () -> expand_curly_internal(receiver, ctx, filter((!) ∘ isnothing, args), ast)) :
 		expand_curly_internal(receiver, ctx, args, ast)
 
-expand_vect(ctx, ast, elems) = any(isassignment, elems) ? 
-	handle_error(ctx, ast, ctx.error_context, "misplaced assignment statement", () -> Vect(filter((!) ∘ isnothing, expand_hcat_arg.(filter((!) ∘ isnothing, elems), (ctx, ))), ast)) : 
+expand_vect(ctx, ast, elems) = any(isassignment, elems) ?
+	handle_error(ctx, ast, ctx.error_context, "misplaced assignment statement", () -> Vect(filter((!) ∘ isnothing, expand_hcat_arg.(filter((!) ∘ isnothing, elems), (ctx, ))), ast)) :
 	Vect(filter((!) ∘ isnothing, expand_hcat_arg.(elems, (ctx, ))), ast)
+
+function expand_try_catch(ctx, block, clauses, ast)
+	expanded_block = expand_forms(block, ctx)
+
+	catch_var = nothing
+	catch_body = nothing
+	else_body = nothing
+	finally_body = nothing
+	for clause in clauses
+		@match clause begin
+			SN(SH(K"catch", _), [SN(SH(K"false", _), _), body]) => begin catch_body = expand_forms(body, ctx) end
+			SN(SH(K"catch", _), [var, body]) => begin catch_var = Expr(var); catch_body = expand_forms(body, ctx) end
+			SN(SH(K"else", _), [body]) => begin else_body = expand_forms(body, ctx) end
+			SN(SH(K"finally", _), [body]) => begin finally_body = expand_forms(body, ctx) end
+		end
+	end
+	TryCatch(expanded_block, catch_var, catch_body, else_body, finally_body, ast)
+end
 
 expand_forms(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = expand_forms(ast, JuliaSyntax.head(ast), JuliaSyntax.children(ast), next_ctx(JuliaSyntax.head(ast), ctx))
 expand_forms(ast, head, children, ctx) = @match (head, children) begin
@@ -660,13 +684,13 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"->", _), [name, body]) => FunctionDef(expand_anon_function(name, ctx)..., expand_forms(body, ctx), ast)
     (SH(K"let", _), [SN(SH(K"block", _), bindings), body]) => LetBinding(filter((!) ∘ isnothing, analyze_let_binding.(bindings, (ctx, ))), expand_forms(body, ctx), ast)
     (SH(K"let", _), [binding, body]) => LetBinding(filter((!) ∘ isnothing,[analyze_let_binding(binding, ctx)]), expand_forms(body, ctx), ast)
-    (SH(K"macro", _), [SN(SH(K"call", _), _) && name, body]) => @match expand_macro_name(name, ctx) begin 
+    (SH(K"macro", _), [SN(SH(K"call", _), _) && name, body]) => @match expand_macro_name(name, ctx) begin
 		(ResolvedName(nm, _) && name, args_stmts, sparams, rett) => MacroDef(name, args_stmts, sparams, rett, expand_forms(body, ctx), ast)
 		(nm, args_stmts, sparams, rett) => handle_error(ctx, nm.location.basenode, ctx.error_context, "Invalid macro name", () -> MacroDef(ResolvedName([gensym()], ast), args_stmts, sparams, rett, expand_forms(body, ctx), ast))
 	end
     (SH(K"macro", _), [SN(SH(K"Identifier", _), _) && name]) => MacroDef(expand_macro_name(name, ctx)..., nothing, ast)
     (SH(K"macro", _), _) => handle_error(ctx, ast, ctx.error_context, "invalid macro definition", () -> MacroDef(ResolvedName([gensym()], ast), nothing, ast))
-    (SH(K"try", _), [block, catch_var, catch_block, else_block, finally_block]) => TryCatch(expand_forms(block, ctx), ifnotfalse(catch_var, x->Expr(x)), ifnotfalse(catch_block, x -> expand_forms(x, ctx)), ifnotfalse(else_block, x -> expand_forms(x, ctx)), ifnotfalse(finally_block, x -> expand_forms(x, ctx)), ast)
+    (SH(K"try", _), [block, clauses...]) => expand_try_catch(ctx, block, clauses, ast)
     (SH(K"block", _), stmts) => Block(expand_forms.(stmts, (ctx, )), ast)
     (SH(K".", _), [op]) => Broadcast(expand_forms(op, ctx), ast)
 	(SH(K".", _), [f, SN(SH(K"quote", _), [x && SN(SH(K"Identifier", _), _)])]) => GetProperty(expand_forms(f, ctx), Expr(x), ast)
@@ -679,20 +703,24 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"<:", _), [a,b]) => FunCall(Variable(:(<:), ast), split_arguments([a, b], ctx)..., ast)
     (SH(K">:", _), [a,b]) => FunCall(Variable(:(>:), ast), split_arguments([a, b], ctx)..., ast)
     (SH(K"-->", _), _) => FunCall(Variable(:(-->)), split_arguments([a, b], ctx)..., ast)
-    (SH(K"where", _), [typ, vars...]) => WhereType(expand_forms(typ, ctx), analyze_typevar.(vars, (ctx, )), ast)
+    (SH(K"where", _), [typ, SN(SH(K"braces", _), vars)]) => WhereType(expand_forms(typ, ctx), analyze_typevar.(vars, (ctx, )), ast)
+    (SH(K"where", _), [typ, var]) => WhereType(expand_forms(typ, ctx), [analyze_typevar(var, ctx)], ast)
     (SH((K"const" || K"local" || K"global") && decltype, _), decls) => Declaration(expand_declaration.(convert_decltype(decltype), decls, (ctx, )), ast)
     (SH(K"=", _), [lhs, rhs]) => Assignment(analyze_lvalue(lhs, ctx), expand_forms(rhs, ctx), ast)
     (SH(K"ref", _), [arr, idxes..., SN(SH(K"parameters", _), _)]) => handle_error(ctx, ast, ctx.error_context, "unexpected semicolon in array expression", () -> GetIndex(expand_forms(arr, ctx), map(el->PositionalArg(expand_forms(el, ctx), el), idxes), ast))
     (SH(K"ref", _), [arr, idxes...]) => GetIndex(expand_forms(arr, ctx), map(el->PositionalArg(expand_forms(el, ctx), el), idxes), ast)
-    (SH(K"curly", _), [receiver, args..., SN(SH(K"parameters", _), _)]) => handle_error(ctx, ast, ctx.error_context, "unexpected semicolon", () -> expand_curly(receiver, ctx, args, ast)) 
+    (SH(K"curly", _), [receiver, args..., SN(SH(K"parameters", _), _)]) => handle_error(ctx, ast, ctx.error_context, "unexpected semicolon", () -> expand_curly(receiver, ctx, args, ast))
     (SH(K"curly", _), [receiver, args...]) => expand_curly(receiver, ctx, args, ast)
 	(SH(K"call", GuardBy(JuliaSyntax.is_infix_op_call)), [arg1, f, arg2...]) && call => FunCall(expand_forms(f, ctx), split_op_arguments([arg1; arg2], ctx)..., ast) # todo Global method definition needs to be placed at the toplevel
     (SH(K"call", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(expand_forms(f, ctx), split_op_arguments([arg], ctx)..., ast)
     (SH(K"call", GuardBy(JuliaSyntax.is_prefix_op_call)), [f, arg]) => FunCall(expand_forms(f, ctx), [PositionalArg(expand_forms(arg, ctx), ast)], [], ast)
 	(SH(K"call", _), [f, args...]) => FunCall(expand_forms(f, ctx), split_arguments(args, ctx)..., ast)
-	(SH(K"call", _), [SN(SH(K".", _), [op]), args]) => FunCall(Broadcast(expand_forms(op, ctx)), split_arguments(args, ctx)..., ast)
-    (SH(K"do", _), [call, args, body]) => 
-		let 
+	(SH(K"dotcall", GuardBy(JuliaSyntax.is_infix_op_call)), [arg1, f, arg2...]) => FunCall(Broadcast(expand_forms(f, ctx), ast), split_op_arguments([arg1; arg2], ctx)..., ast)
+	(SH(K"dotcall", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(Broadcast(expand_forms(f, ctx), ast), split_op_arguments([arg], ctx)..., ast)
+	(SH(K"dotcall", GuardBy(JuliaSyntax.is_prefix_op_call)), [f, arg]) => FunCall(Broadcast(expand_forms(f, ctx), ast), [PositionalArg(expand_forms(arg, ctx), ast)], ast)
+	(SH(K"dotcall", _), [f, args...]) => FunCall(Broadcast(expand_forms(f, ctx), ast), split_arguments(args, ctx)..., ast)
+    (SH(K"do", _), [call, args, body]) =>
+		let
 			(_, args, _, _, _) = expand_anon_function(args, ctx);
 			DoStatement(expand_forms(call, ctx), args, expand_forms(body, ctx), ast)
 		end
@@ -708,10 +736,10 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"while", _), [cond, body]) => let ictx = ExpandCtx(ctx; is_loop=true); WhileStmt(expand_forms(cond, ictx), expand_forms(body, ictx), ast) end
     (SH(K"break", _), _) => if ctx.is_loop BreakStmt(ast) else handle_error(ctx, ast, ctx.error_context, "break or continue outside loop", () -> Literal(nothing, ast)) end
     (SH(K"continue", _), _) => if ctx.is_loop ContinueStmt(ast) else handle_error(ctx, ast, ctx.error_context, "break or continue outside loop", () -> Literal(nothing, ast)) end
-    (SH(K"return", _), [SN(SH(K"nothing", _), _)]) => ReturnStmt(nothing, ast)
+    (SH(K"return", _), []) => ReturnStmt(nothing, ast)
     (SH(K"return", _), [val]) => ReturnStmt(expand_forms(val, ctx), ast)
     (SH(K"for", _), [SN(SH(K"=", _), _) && iterspec, body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx)], expand_forms(body, ictx), ast) end
-    (SH(K"for", _), [SN(SH(K"block", _), iterspecs), body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx) for iterspec in iterspecs], expand_forms(body, ictx), ast) end
+    (SH(K"for", _), [SN(SH(K"cartesian_iterator", _), iterspecs), body]) => let ictx = ExpandCtx(ctx; is_loop=true); ForStmt(Pair{LValue, Expression}[analyze_iterspec(iterspec, ictx) for iterspec in iterspecs], expand_forms(body, ictx), ast) end
     (SH(K"&&", _), [l, r]) => FunCall(Variable(:(&&), ast), split_op_arguments([l, r], ctx)..., ast)
     (SH(K"||", _), [l, r]) => FunCall(Variable(:(||), ast), split_op_arguments([l, r], ctx)..., ast)
     (SH(upd && GuardBy(is_update), _ && GuardBy(JuliaSyntax.is_dotted)), [lhs, rhs]) => BroadcastUpdate(Symbol(upd), expand_forms(lhs,ctx), expand_forms(rhs, ctx), ast)
@@ -729,11 +757,11 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"ncat", flags), elems) => NCat(nothing, JuliaSyntax.numeric_flags(flags), filter((!) ∘ isnothing, expand_nrow.(elems, (ctx, ))), ast)
     (SH(K"typed_ncat", flags), [type, elems...]) => NCat(expand_forms(type, ctx), JuliaSyntax.numeric_flags(flags), filter((!) ∘ isnothing, expand_nrow.(elems, (ctx, ))), ast)
     (SH(K"generator", _), elems && GuardBy(x -> any(contains_return, x))) => handle_error(ctx, ast, ctx.error_context, "\"return\" not allowed inside comprehension or generator", () -> expand_generator(ast, ctx))
-    (SH((K"generator" || K"flatten") && head, _), [expr, iters...]) => expand_generator(ast, ctx)
+    (SH((K"generator" || K"cartesian_iterator") && head, _), [expr, iters...]) => expand_generator(ast, ctx)
     (SH(K"comprehension", _), [generator]) => Comprehension(nothing, expand_generator(generator, ctx), ast)
     (SH(K"typed_comprehension", _), [type, generator]) => Comprehension(expand_forms(type, ctx), expand_generator(generator, ctx), ast)
 	(SH(K"Identifier", _), _) => Variable(Expr(ast), ast)
-	(SH(K"macrocall", _), [SN(SH(K"core_@doc", _), _), args...]) => resolve_macro(ast, ctx.macro_context, Val{Symbol(Symbol("@doc"))}(), args, ctx)
+	(SH(K"doc", _), [args...]) => resolve_macro(ast, ctx.macro_context, Val{Symbol(Symbol("@doc"))}(), args, ctx)
 	(SH(K"macrocall", _), [mcro, args...]) => resolve_macro(ast, ctx.macro_context, Val{Symbol(mcro)}(), args, ctx)
     (SH(K"?", _), [cond, then, els]) => Ternary(expand_forms(cond, ctx), expand_forms(then, ctx), expand_forms(els, ctx), ast)
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => handle_error(ctx, ast, ctx.error_context, "must be at top level", () -> Literal(nothing, ast))
