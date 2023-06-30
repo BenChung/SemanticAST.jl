@@ -1,5 +1,7 @@
 # SemanticAST
 
+[![](https://img.shields.io/badge/docs-latest-blue.svg)](https://benchung.github.io/SemanticAST.jl/dev)
+
 SemanticAST.jl aims to provide a unified view of Julia's AST by reproducing much of the logic that the [lowering](https://docs.julialang.org/en/v1/devdocs/eval/#dev-parsing) phase does.
 Many of the more structural errors that Julia produces (for example how a toplevel `::Int` declaration begets `syntax: invalid "::" syntax`) are not actually produced by the parser
 but instead by a later lowering phase. In effect, lowering (in conjunction with macro expansion) defines all of the Julia AST forms that can be successfully compiled to executable runtime code.
