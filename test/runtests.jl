@@ -182,7 +182,8 @@ expr_tests() = [
 		"a[5] .= b" => "BroadcastAssignment(GetIndex(Variable(:a), [PositionalArg(Literal(5))]), Variable(:b))",
 		"a[5, 6] .= b" => "BroadcastAssignment(GetIndex(Variable(:a), [PositionalArg(Literal(5)), PositionalArg(Literal(6))]), Variable(:b))",
 		"x+y .= y" => "BroadcastAssignment(FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), Variable(:y))",
-		"x+y .+= y" => "BroadcastUpdate(:+=, FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), Variable(:y))"
+		"x+y .+= y" => "BroadcastUpdate(:+=, FunCall(Variable(:+), [PositionalArg(Variable(:x)), PositionalArg(Variable(:y))], []), Variable(:y))",
+		".!f" => "FunCall(Broadcast(Variable(:!)), [PositionalArg(Variable(:f))], [])"
 	],
 	:call => [
 		"a(x)" => "FunCall(Variable(:a), [PositionalArg(Variable(:x))], [])",
