@@ -43,11 +43,12 @@ wex3 = JuliaSyntax.parseall(SN, "x where T <: I")
 wex4 = JuliaSyntax.parseall(SN, "x where T <: I where I")
 wex5 = JuliaSyntax.parseall(SN, "x where {T, V}")
 @testset "flatten_where_expr" begin
-	@test sprint(show, flatten_where_expr(childof(wex1, 1))) == "(x, Any[T])"
-	@test sprint(show, flatten_where_expr(childof(wex2, 1))) == "(x, Any[S, T])"
-	@test sprint(show, flatten_where_expr(childof(wex3, 1))) == "(x, Any[(<: T I)])"
-	@test sprint(show, flatten_where_expr(childof(wex4, 1))) == "(x, Any[I, (<: T I)])"
-	@test sprint(show, flatten_where_expr(childof(wex5, 1))) == "(x, Any[T, V])"
+	ctx = ExpandCtx(true, false)
+	@test sprint(show, flatten_where_expr(childof(wex1, 1), ctx)) == "(x, Any[T])"
+	@test sprint(show, flatten_where_expr(childof(wex2, 1), ctx)) == "(x, Any[S, T])"
+	@test sprint(show, flatten_where_expr(childof(wex3, 1), ctx)) == "(x, Any[(<: T I)])"
+	@test sprint(show, flatten_where_expr(childof(wex4, 1), ctx)) == "(x, Any[I, (<: T I)])"
+	@test sprint(show, flatten_where_expr(childof(wex5, 1), ctx)) == "(x, Any[T, V])"
 end
 
 atv1 = JuliaSyntax.parseall(SN, "A <: B")
@@ -144,6 +145,11 @@ expr_tests() = [
 		"macro foo(a::Int, b::Int, c=2) end" => "MacroDef(ResolvedName([:foo]), [FnArg(IdentifierAssignment(:a), nothing, Variable(:Int)), FnArg(IdentifierAssignment(:b), nothing, Variable(:Int)), FnArg(IdentifierAssignment(:c), Literal(2), nothing)], [], nothing, Block([]))",
 		"macro foo(a::Int, b::Int, c=2, d::Int) end" => ErrorResult(),
 		"macro foo(; x) end" => ErrorResult()
+	],
+	:weirdwhere => [
+		"where = 3" => "Assignment(IdentifierAssignment(:where), Literal(3))",
+		"func(where) = 12" => "Assignment(FunctionAssignment(ResolvedName([:func]), [FnArg(IdentifierAssignment(:where), nothing, nothing)], [], [], nothing), Literal(12))",
+		"func(where::Int) = 12" => "Assignment(FunctionAssignment(ResolvedName([:func]), [FnArg(IdentifierAssignment(:where), nothing, Variable(:Int))], [], [], nothing), Literal(12))"
 	],
 	:try => [
 		"try \n x \n catch e \n y \n finally \n z end" => "TryCatch(Block([Variable(:x)]), :e, Block([Variable(:y)]), nothing, Block([Variable(:z)]))",

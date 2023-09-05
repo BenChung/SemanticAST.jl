@@ -120,7 +120,7 @@ kindof(ex) = JuliaSyntax.kind(JuliaSyntax.head(ex))
 childof = JuliaSyntax.child
 just_argslist(args) = kindof(args[1]) ∈ KSet"tuple block ..." || (kindof(args[1]) == K"where" && just_argslist(args[1]))
 
-function flatten_where_expr(ex)
+function flatten_where_expr(ex, ctx)
 	vars = Any[]
 	if kindof(ex) != K"where"
 		throw(ASTException(ex, "Invalid expression (internal error: flattening non-where)")) # using direct throw due to fatal error
@@ -135,7 +135,7 @@ function flatten_where_expr(ex)
 				push!(vars, var)
 				ex = body
 			end
-			_ => ex
+			_ => return handle_error(ctx, ex, ctx.error_context, "Invalid use of where", () -> (ex, vars))
 		end
 	end
 	return (ex, vars)
@@ -169,6 +169,7 @@ analyze_lvalue(expr, ctx; is_for=false) = @match expr begin
 		else
 			IdentifierAssignment(Expr(id), expr)
 		end
+	SN(SH(K"where", _), ()) => IdentifierAssignment(:where, expr) # why is this an empty tuple? I don't know!
 	SN(SH(K".", _), [a,b]) => FieldAssignment(expand_forms(a, ctx), unquote(b), expr)
 	SN(SH(K"tuple", _), [_, args..., SN(SH(K"parameters", _), _)]) => handle_error(ctx, expr, ctx.error_context, "invalid assignment location", () -> IdentifierAssignment(gensym(), expr))
 	SN(SH(K"tuple", _), [SN(SH(K"parameters", _), params)]) =>
@@ -337,12 +338,12 @@ function analyze_call(call, name, args, raw_typevars, rett, ctx; is_macro=false)
 	return resolve_function_name(name, ctx), args_stmts, kwargs_stmts, sparams, (isnothing(rett) ? nothing : expand_forms(rett, ctx))
 end
 
-function destructure_function_head(name)
+function destructure_function_head(name, ctx)
 	(name, raw_typevars) = @match name begin
 		SN(SH(K"::", _), [nexpr, SN(SH(K"where", _), _) && clause]) => begin
-			return (nexpr, flatten_where_expr(clause)...)
+			return (nexpr, flatten_where_expr(clause, ctx)...)
 		end
-		SN(SH(K"where", _), _) => flatten_where_expr(name)
+		SN(SH(K"where", _), _) => flatten_where_expr(name, ctx)
 		_ => (name, [])
 	end # this control flow is very cursed sorry
 	rett, name = @match name begin
@@ -354,7 +355,7 @@ end
 
 function expand_function_name(name, ctx; is_macro = false)
 	orig_expr = name
-	name, rett, raw_typevars = destructure_function_head(name)
+	name, rett, raw_typevars = destructure_function_head(name, ctx)
 	return @match name begin
 		SN(SH(K"call", _), [name, args...]) =>  analyze_call(orig_expr, name, args, raw_typevars, rett, ctx; is_macro = is_macro)
 		SN(SH(K"tuple", _), [args...]) =>  analyze_call(orig_expr, nothing, args, raw_typevars, rett, ctx; is_macro=is_macro)
@@ -364,7 +365,7 @@ function expand_function_name(name, ctx; is_macro = false)
 end
 function expand_anon_function(spec, ctx)
 	orig_expr = spec
-	spec, rett, raw_typevars = destructure_function_head(spec)
+	spec, rett, raw_typevars = destructure_function_head(spec, ctx)
 	return @match spec begin
 		SN(SH(K"tuple", _), [args...]) =>  analyze_call(orig_expr, nothing, args, raw_typevars, rett, ctx)
 		SN(SH(K"Identifier", _), _) && arg =>  analyze_call(orig_expr, nothing, [arg], raw_typevars, rett, ctx)
