@@ -281,7 +281,7 @@ resolve_function_name(e, ctx) = @match e begin
 		else
 			parse_func_name(ctx, receiver, args, e)
 		end
-    SN(GuardBy(JuliaSyntax.is_operator) && GuardBy((!) ∘ JuliaSyntax.is_dotted), _) && name => ResolvedName([Expr(name)], e) # so are non-dotted operators
+    SN(GuardBy(JuliaSyntax.is_operator) && GuardBy((!) ∘ JuliaSyntax.is_dotted), ()) && name => ResolvedName([Expr(name)], e) # so are non-dotted operators
 	nothing => AnonFuncName(e)
 	_ => handle_error(ctx, e, ctx.error_context, "invalid function name", () -> ResolvedName([gensym()], e))
 end

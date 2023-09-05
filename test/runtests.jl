@@ -131,6 +131,7 @@ expr_tests() = [
         "function foo(a::b = 9, b::c = 17) end" => "FunctionDef(ResolvedName([:foo]), [FnArg(IdentifierAssignment(:a), Literal(9), Variable(:b)), FnArg(IdentifierAssignment(:b), Literal(17), Variable(:c))], [], [], nothing, Block([]))",
         "function -(a, b) end" => "FunctionDef(ResolvedName([:-]), [FnArg(IdentifierAssignment(:a), nothing, nothing), FnArg(IdentifierAssignment(:b), nothing, nothing)], [], [], nothing, Block([]))",
         "function .-(a, b) end" => ErrorResult(),
+		"function \$x(a, b) end" => ErrorResult(),
         "function f(;x...) end" => "FunctionDef(ResolvedName([:f]), [], [KwArg(:x, nothing, nothing, true)], [], nothing, Block([]))",
         "function f(a, b, c...) end" =>  "FunctionDef(ResolvedName([:f]), [FnArg(IdentifierAssignment(:a), nothing, nothing), FnArg(IdentifierAssignment(:b), nothing, nothing), FnArg(VarargAssignment(IdentifierAssignment(:c)), nothing, nothing)], [], [], nothing, Block([]))"
 	],
