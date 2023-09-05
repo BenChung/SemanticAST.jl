@@ -656,15 +656,10 @@ expand_tuple_arg(expr, ctx) = @match expr begin
     _ => expand_forms(expr, ctx)
 end
 
-@data Docstrings begin
-    Docstring(doc::Expression, defn::Union{Expression, ToplevelStmts})
-    CallDocstring(doc::Expression, name::FunctionName, arguments::Vector{FnArg}, kw_args::Vector{KwArg}, sparams::Vector{TyVar}, rett::Union{Expression, Nothing})
-end
-
 expand_docstring(expand, args, ast, ctx) = @match args begin
-    [docs, SN(SH(K"::", _), [SN(SH(K"call" || K"where", _), _) && fn, typ])] => let (name, args, kwargs, sparams, rett) = expand_function_name(fn,ctx); CallDocstring(expand_forms(docs, ctx), name, args, kwargs, sparams, expand_forms(typ, ctx)) end
-    [docs, SN(SH(K"call" || K"where", _), _) && fn] => CallDocstring(expand_forms(docs, ctx), expand_function_name(fn, ctx)...)
-    [docs, inner_ast] => Docstring(expand_forms(docs, ctx), expand(inner_ast, ctx))
+    [docs, SN(SH(K"::", _), [SN(SH(K"call" || K"where", _), _) && fn, typ])] => let (name, args, kwargs, sparams, rett) = expand_function_name(fn,ctx); CallDocstring(expand_forms(docs, ctx), name, args, kwargs, sparams, expand_forms(typ, ctx), ast) end
+    [docs, SN(SH(K"call" || K"where", _), _) && fn] => CallDocstring(expand_forms(docs, ctx), expand_function_name(fn, ctx)..., ast)
+    [docs, inner_ast] => Docstring(expand_forms(docs, ctx), expand(inner_ast, ctx), ast)
 end
 
 

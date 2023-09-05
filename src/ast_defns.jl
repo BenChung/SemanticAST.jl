@@ -193,7 +193,14 @@ export Expression, Literal, Variable, FunctionDef, MacroDef, Block, LetBinding, 
 end
 export LValueImpl, IdentifierAssignment, OuterIdentifierAssignment, FieldAssignment, TupleAssignment, RefAssignment, VarargAssignment, TypedAssignment, NamedTupleAssignment, FunctionAssignment, BroadcastAssignment, UnionAllAssignment
 
-@generated function Base.show(io::IO, a::T) where T<:Union{Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg, TyVar, KwArg, StructField}
+
+@ast_data Docstrings <: ASTNode begin
+    Docstring(doc::Expression, defn::Union{Expression, ToplevelStmts})
+    CallDocstring(doc::Expression, name::FunctionName, arguments::Vector{FnArg}, kw_args::Vector{KwArg}, sparams::Vector{TyVar}, rett::Union{Expression, Nothing})
+end
+export Docstring, CallDocstring
+
+@generated function Base.show(io::IO, a::T) where T<:Union{Docstrings, Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg, TyVar, KwArg, StructField}
 	outbody = []
 	fldnames = filter(x -> x != :location, fieldnames(T))
 	for fld in fldnames[1:end-1]
@@ -211,7 +218,7 @@ export LValueImpl, IdentifierAssignment, OuterIdentifierAssignment, FieldAssignm
 	end
 end
 
-const ASTNodes = Union{Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg, TyVar, LValue, KwArg, StructField}
+const ASTNodes = Union{Docstrings, Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg, TyVar, LValue, KwArg, StructField}
 function Base.show(io::IO, v::Vector{T}) where T<:Union{ASTNodes, Tuple{Vararg{ASTNodes}}, Pair{X, Y} where {X<:ASTNodes,Y<:ASTNodes}, Union{String, Y} where Y <: ASTNodes}
 	print(io, "[")
 	for el in v[1:end-1]
@@ -230,7 +237,7 @@ function Base.show(io::IO, (l, r)::Pair{N1, N2}) where {N1 <: ASTNodes, N2 <: AS
 	show(io, r)
 end
 
-@generated function Base.:(==)(a::T, b::T) where T<:Union{Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg}
+@generated function Base.:(==)(a::T, b::T) where T<:Union{Docstrings, Expression, VarDecl, NamedTupleBody, IfClause, Rows, Iterspec, ImportPath, DepClause, FunctionName, ToplevelStmts, LValueImpl, CallArg, FnArg}
 	if length(fieldnames(T)) == 0
 		return true
 	end
