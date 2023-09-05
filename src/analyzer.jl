@@ -413,7 +413,7 @@ node_to_bool = @λ begin
 end
 
 unpack_attrs(expr, attrs, mutable, ctx) = @match (expr, mutable) begin
-	(SN(SH(K"=", _), [lhs && GuardBy(eventually_decl), value]), _) => handle_error(ctx, expr, ctx.error_context, "operator = inside type definition is reserved", () -> StructField(gensym(), nothing, [], expr))
+	(SN(SH(K"=", _), [lhs && GuardBy(eventually_decl), value]), _) => handle_error(ctx, expr, ctx.error_context, "operator = inside type definition is reserved", () -> StructField(gensym(), nothing, attrs, expr))
 	(SN(SH(K"::", _), [SN(SH(K"Identifier", _), _) && name, typ]), _) => StructField(Expr(name), expand_forms(typ, ctx), attrs, expr)
 	(SN(SH(K"Identifier", _), _) && name, _) => StructField(Expr(name), nothing, attrs, expr)
 	(SN(SH(K"const", _), [ex]), true) => unpack_attrs(ex, attrs | FIELD_CONST, mutable, ctx)
