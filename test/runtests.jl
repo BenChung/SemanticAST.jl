@@ -441,6 +441,9 @@ expr_tests() = [
     ],
     :transpose => [
         "x'" => "FunCall(Variable(Symbol(\"'\")), [PositionalArg(Variable(:x))], [])"
+    ],
+    :juxtapose => [
+        "2x" => "FunCall(Variable(:*), [PositionalArg(Literal(2)), PositionalArg(Variable(:x))], [])"
     ]
 ]
 

@@ -787,6 +787,7 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
     (SH(K"call", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(expand_forms(f, ctx), split_op_arguments([arg], ctx)..., ast)
     (SH(K"call", GuardBy(JuliaSyntax.is_prefix_op_call)), [f, arg]) => FunCall(expand_forms(f, ctx), [PositionalArg(expand_forms(arg, ctx), ast)], [], ast)
 	(SH(K"call", _), [f, args...]) => FunCall(expand_forms(f, ctx), split_arguments(args, ctx)..., ast)
+	(SH(K"juxtapose", _), [a, b]) => FunCall(Variable(:(*), ast), [PositionalArg(expand_forms(a, ctx), ast), PositionalArg(expand_forms(b, ctx), ast)], [], ast)
 	(SH(K"dotcall", GuardBy(JuliaSyntax.is_infix_op_call)), [arg1, f, arg2...]) => FunCall(Broadcast(expand_forms(f, ctx), ast), split_op_arguments([arg1; arg2], ctx)..., ast)
 	(SH(K"dotcall", GuardBy(JuliaSyntax.is_postfix_op_call)), [arg, f]) => FunCall(Broadcast(expand_forms(f, ctx), ast), split_op_arguments([arg], ctx)..., ast)
 	(SH(K"dotcall", GuardBy(JuliaSyntax.is_prefix_op_call)), [f, arg]) => FunCall(Broadcast(expand_forms(f, ctx), ast), [PositionalArg(expand_forms(arg, ctx), ast)], ast)
