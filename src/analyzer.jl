@@ -841,6 +841,6 @@ expand_forms(ast, head, children, ctx) = @match (head, children) begin
 	(SH(K"using" || K"import" || K"export" || K"module" || K"abstract" || K"struct" || K"primitive", _), _) => handle_error(ctx, ast, ctx.error_context, "must be at top level", () -> Literal(nothing, ast))
 	(SH(op && GuardBy(JuliaSyntax.is_operator), _ && GuardBy(JuliaSyntax.is_dotted)), _) => Broadcast(Variable(Symbol(string(op)), ast), ast)
     (SH(K"&", _), [var]) => handle_error(ctx, ast, ctx.error_context, "Invalid &", () -> expand_forms(var, ctx))
-	(SH(GuardBy(JuliaSyntax.is_operator), _), _) => try Variable(Expr(ast), ast) catch e println(ast); rethrow(e) end
+	(SH(GuardBy(JuliaSyntax.is_operator), _), _) => try Variable(Expr(ast), ast) catch e println(ast); handle_error(ctx, ast, ctx.error_context, "invalid expression", () -> Literal(nothing, ast)) end
     (head, args) => throw("Unimplemented $head")
 end
