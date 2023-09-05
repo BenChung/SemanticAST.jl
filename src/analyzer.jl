@@ -484,7 +484,7 @@ function expand_primitive_def(expr, sig, size, ctx)
 	else
 		name, params, super = analyzed
 	end
-	bounds = analyze_typevar.(params)
+	bounds = analyze_typevar.(params, (ctx, ))
 	params = getfield.(bounds, :name)
 	return PrimitiveDefStmt(Expr(name), params, isnothing(super) ? nothing : expand_forms(super, ctx), expand_forms(size, ctx), expr)
 end
