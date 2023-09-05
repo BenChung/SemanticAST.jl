@@ -592,7 +592,7 @@ analyze_iterspec(expr, ctx) = @match expr begin
 	SN(SH(K"=", _), [var, iter]) => analyze_lvalue(var, ctx; is_for=true) => expand_forms(iter, ctx)
 end
 
-is_update(kw) = kw ∈ KSet"+= -= *= /= //= \= ^= ÷= |= &= ⊻= <<= >>= >>>="
+is_update(kw) = kw ∈ KSet"+= -= *= /= //= \= ^= ÷= |= &= ⊻= <<= >>= >>>= %= $= ⩴ ≕"
 
 expand_hcat_arg(expr, ctx) = @match expr begin
 	GuardBy(isassignment) => begin handle_error(ctx, expr, ctx.error_context, "misplaced assignment statement", nothing); nothing end

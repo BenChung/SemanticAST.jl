@@ -327,8 +327,12 @@ expr_tests() = [
 		"for outer x in y; w end" => "ForStmt([OuterIdentifierAssignment(:x) => Variable(:y)], Block([Variable(:w)]))",
 		"for outer x in y, z in l; w end" => "ForStmt([OuterIdentifierAssignment(:x) => Variable(:y), IdentifierAssignment(:z) => Variable(:l)], Block([Variable(:w)]))"
 	],
-	:update => [
+	:update => [  
 		"x += y" => "Update(:+=, IdentifierAssignment(:x), Variable(:y))",
+		"x %= y" => "Update(:%=, IdentifierAssignment(:x), Variable(:y))",
+		"x \$= y" => "Update(:\$=, IdentifierAssignment(:x), Variable(:y))",
+		"x ≕ y" => "Update(:≕, IdentifierAssignment(:x), Variable(:y))",
+		"x ⩴ y" => "Update(:⩴, IdentifierAssignment(:x), Variable(:y))",
 		"(x, y) += z" => "Update(:+=, TupleAssignment([IdentifierAssignment(:x), IdentifierAssignment(:y)]), Variable(:z))",
 		"x .+= y" => "BroadcastUpdate(:+=, Variable(:x), Variable(:y))",
 		"(x, y) .+= z" => "BroadcastUpdate(:+=, TupleExpr([Variable(:x), Variable(:y)]), Variable(:z))",
