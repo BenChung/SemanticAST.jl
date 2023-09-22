@@ -455,7 +455,18 @@ expr_tests() = [
         "x'" => "FunCall(Variable(Symbol(\"'\")), [PositionalArg(Variable(:x))], [])"
     ],
     :juxtapose => [
-        "2x" => "FunCall(Variable(:*), [PositionalArg(Literal(2)), PositionalArg(Variable(:x))], [])"
+        "2x" => "FunCall(Variable(:*), [PositionalArg(Literal(2)), PositionalArg(Variable(:x))], [])",
+        "2x + 2y" => "FunCall(Variable(:+), [PositionalArg(FunCall(Variable(:*), [PositionalArg(Literal(2)), PositionalArg(Variable(:x))], [])), PositionalArg(FunCall(Variable(:*), [PositionalArg(Literal(2)), PositionalArg(Variable(:y))], []))], [])"
+    ],
+    :literal => [
+        "2" => "Literal(2)",
+        "2.0" => "Literal(2.0)",
+        "0b1010" => "Literal(0x0a)",
+        "0x10" => "Literal(0x10)",
+        "0o10" => "Literal(0x08)",
+        "2.f0" => "Literal(2.0f0)",
+        "'h'" => "Literal('h')",
+        #"`h`" => "FunCall(Variable(:*), [PositionalArg(Literal(2)), PositionalArg(Variable(:x))], [])" TODO
     ]
 ]
 

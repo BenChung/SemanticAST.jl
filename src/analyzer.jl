@@ -745,7 +745,7 @@ more discussion.
 """
 expand_forms(ast::JuliaSyntax.SyntaxNode, ctx::ExpandCtx) = expand_forms(ast, JuliaSyntax.head(ast), JuliaSyntax.children(ast), next_ctx(JuliaSyntax.head(ast), ctx))
 expand_forms(ast, head, children, ctx) = @match (head, children) begin
-	(SH(K"Float" || K"Integer" || K"String" || K"Char" || K"char" || K"true" || K"false" || K"HexInt", _), _) => Literal(Expr(ast), ast)
+	(SH(K"Float" || K"Float32" || K"Integer" || K"String" || K"Char" || K"char" || K"true" || K"false" || K"HexInt" || K"OctInt" || K"BinInt", _), _) => Literal(Expr(ast), ast)
     (SH(K"quote",_), _) => Quote(ast, ast) # need to port bits of macroexpansion into this
     (SH(K"function", _), [name, body]) => FunctionDef(expand_function_name(name, ctx)..., expand_forms(body, ctx), ast)
     (SH(K"function", _), [name]) => FunctionDef(expand_function_name(name, ctx)..., nothing, ast)
